@@ -112,13 +112,7 @@ const (
 	MsgUserDefaultTokenFailed        = "user.default_token_failed"
 	MsgUserAffCodeEmpty              = "user.aff_code_empty"
 	MsgUserEmailEmpty                = "user.email_empty"
-	MsgUserGitHubIdEmpty             = "user.github_id_empty"
-	MsgUserDiscordIdEmpty            = "user.discord_id_empty"
 	MsgUserOidcIdEmpty               = "user.oidc_id_empty"
-	MsgUserWeChatIdEmpty             = "user.wechat_id_empty"
-	MsgUserTelegramIdEmpty           = "user.telegram_id_empty"
-	MsgUserTelegramNotBound          = "user.telegram_not_bound"
-	MsgUserLinuxDOIdEmpty            = "user.linux_do_id_empty"
 	MsgUserQuotaChangeZero           = "user.quota_change_zero"
 )
 
@@ -298,7 +292,6 @@ const (
 	MsgOAuthConnectFailed   = "oauth.connect_failed"
 	MsgOAuthTokenFailed     = "oauth.token_failed"
 	MsgOAuthUserInfoEmpty   = "oauth.user_info_empty"
-	MsgOAuthTrustLevelLow   = "oauth.trust_level_low"
 )
 
 // Model layer error messages (for translation in controller)
