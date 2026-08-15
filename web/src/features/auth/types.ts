@@ -96,26 +96,11 @@ export interface SystemStatus {
     version?: string
     system_name?: string
     logo?: string
-    github_oauth?: boolean
-    github_client_id?: string
-    discord_oauth?: boolean
-    discord_client_id?: string
     oidc_enabled?: boolean
     oidc_authorization_endpoint?: string
     oidc_client_id?: string
     oidc_display_name?: string
-    linuxdo_oauth?: boolean
-    linuxdo_client_id?: string
-    telegram_oauth?: boolean
-    telegram_bot_name?: string
     passkey_login?: boolean
-    wechat_login?: boolean
-    wechat_qrcode?: string
-    wechat_qr_code?: string
-    wechat_qrcode_image_url?: string
-    wechat_qr_code_image_url?: string
-    wechat_account_qrcode_image_url?: string
-    WeChatAccountQRCodeImageURL?: string
     turnstile_check?: boolean
     turnstile_site_key?: string
     email_verification?: boolean
@@ -141,26 +126,11 @@ export interface SystemStatus {
   version?: string
   system_name?: string
   logo?: string
-  github_oauth?: boolean
-  github_client_id?: string
-  discord_oauth?: boolean
-  discord_client_id?: string
   oidc_enabled?: boolean
   oidc_authorization_endpoint?: string
   oidc_client_id?: string
   oidc_display_name?: string
-  linuxdo_oauth?: boolean
-  linuxdo_client_id?: string
-  telegram_oauth?: boolean
-  telegram_bot_name?: string
   passkey_login?: boolean
-  wechat_login?: boolean
-  wechat_qrcode?: string
-  wechat_qr_code?: string
-  wechat_qrcode_image_url?: string
-  wechat_qr_code_image_url?: string
-  wechat_account_qrcode_image_url?: string
-  WeChatAccountQRCodeImageURL?: string
   turnstile_check?: boolean
   turnstile_site_key?: string
   email_verification?: boolean
@@ -189,7 +159,7 @@ export interface SystemStatus {
 
 export interface OAuthProvider {
   name: string
-  type: 'github' | 'discord' | 'oidc' | 'linuxdo' | 'telegram' | 'wechat'
+  type: 'oidc'
   enabled: boolean
   clientId?: string
   authEndpoint?: string

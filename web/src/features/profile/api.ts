@@ -125,31 +125,6 @@ export async function bindEmail(
   return res.data
 }
 
-/**
- * Bind WeChat account
- */
-export async function bindWeChat(code: string): Promise<ApiResponse> {
-  const res = await api.post(
-    '/api/oauth/wechat/bind',
-    { code },
-    { skipBusinessError: true, skipErrorHandler: true }
-  )
-  return res.data
-}
-
-export interface TelegramBindFlow {
-  flow_token: string
-  callback_url: string
-  expires_at: number
-}
-
-export async function startTelegramBind(): Promise<
-  ApiResponse<TelegramBindFlow>
-> {
-  const res = await api.post('/api/oauth/telegram/bind/start')
-  return res.data
-}
-
 // ============================================================================
 // Login Session APIs
 // ============================================================================

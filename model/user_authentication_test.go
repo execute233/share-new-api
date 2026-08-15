@@ -20,10 +20,10 @@ import (
 func TestHardDeleteUserFailsClosedWhenAuthFenceCannotPublish(t *testing.T) {
 	truncateTables(t)
 
-	user := User{Username: "hard-delete-user", Password: "password", TelegramId: "hard-delete-telegram"}
+	user := User{Username: "hard-delete-user", Password: "password"}
 	require.NoError(t, DB.Create(&user).Error)
 	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
-		return ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderTelegram, user.TelegramId, user.Id)
+		return ClaimExternalIdentityWithTx(tx, "oidc", "hard-delete-external-id", user.Id)
 	}))
 	require.NoError(t, DB.Create(&Token{UserId: user.Id, Key: "hard-delete-token"}).Error)
 	require.NoError(t, DB.Create(&TwoFA{UserId: user.Id, Secret: "secret", IsEnabled: true}).Error)
@@ -79,11 +79,10 @@ func TestHardDeleteUserPublishesTombstoneAndPurgesAuthenticationData(t *testing.
 
 	user := User{
 		Username: "hard-delete-success", Password: "password", AuthVersion: 1,
-		TelegramId: "hard-delete-success-telegram",
 	}
 	require.NoError(t, DB.Create(&user).Error)
 	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
-		return ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderTelegram, user.TelegramId, user.Id)
+		return ClaimExternalIdentityWithTx(tx, "oidc", "hard-delete-success-external-id", user.Id)
 	}))
 	require.NoError(t, DB.Create(&Token{UserId: user.Id, Key: "hard-delete-success-token"}).Error)
 	require.NoError(t, DB.Create(&TwoFA{UserId: user.Id, Secret: "secret", IsEnabled: true}).Error)

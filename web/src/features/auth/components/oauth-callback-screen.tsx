@@ -16,10 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Loader2, Send, Shield, UserRound, type LucideIcon } from 'lucide-react'
+import { Loader2, Shield, UserRound, type LucideIcon } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SiGithub, SiLinux, SiWechat } from 'react-icons/si'
 
 import { AuthLayout } from '../auth-layout'
 
@@ -34,26 +33,7 @@ type ProviderMeta = {
 }
 
 const providerDictionary: Record<string, ProviderMeta> = {
-  github: {
-    label: 'GitHub',
-    Icon: (props: { className?: string }) => (
-      <SiGithub className={props.className} focusable='false' />
-    ),
-  },
   oidc: { label: 'OIDC', Icon: Shield },
-  linuxdo: {
-    label: 'LinuxDO',
-    Icon: (props: { className?: string }) => (
-      <SiLinux className={props.className} focusable='false' />
-    ),
-  },
-  telegram: { label: 'Telegram', Icon: Send },
-  wechat: {
-    label: 'WeChat',
-    Icon: (props: { className?: string }) => (
-      <SiWechat className={props.className} focusable='false' />
-    ),
-  },
 }
 
 export function OAuthCallbackScreen({

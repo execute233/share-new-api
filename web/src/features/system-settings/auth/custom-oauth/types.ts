@@ -118,20 +118,6 @@ export interface OAuthPreset {
 
 export const OAUTH_PRESETS: OAuthPreset[] = [
   {
-    key: 'github-enterprise',
-    name: 'GitHub Enterprise',
-    icon: 'github',
-    authorization_endpoint: '/login/oauth/authorize',
-    token_endpoint: '/login/oauth/access_token',
-    user_info_endpoint: '/api/v3/user',
-    scopes: 'user:email',
-    user_id_field: 'id',
-    username_field: 'login',
-    display_name_field: 'name',
-    email_field: 'email',
-    needsBaseUrl: true,
-  },
-  {
     key: 'gitlab',
     name: 'GitLab',
     icon: 'gitlab',
