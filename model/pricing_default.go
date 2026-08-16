@@ -8,7 +8,6 @@ import (
 var defaultVendorRules = map[string]string{
 	"gpt":      "OpenAI",
 	"dall-e":   "OpenAI",
-	"whisper":  "OpenAI",
 	"o1":       "OpenAI",
 	"o3":       "OpenAI",
 	"claude":   "Anthropic",
