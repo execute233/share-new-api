@@ -112,7 +112,6 @@ import {
   useSecureVerification,
 } from '@/features/auth/secure-verification'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { useHiddenClickUnlock } from '@/hooks/use-hidden-click-unlock'
 import {
   ADMIN_PERMISSION_ACTIONS,
   ADMIN_PERMISSION_RESOURCES,
@@ -280,7 +279,6 @@ const SENSITIVE_FORM_FIELDS = [
   'settings',
   'setting',
   'advanced_custom',
-  'azure_responses_version',
   'force_format',
   'thinking_to_content',
   'proxy',
@@ -764,23 +762,6 @@ export function ChannelMutateDrawer({
   const shouldPreviewUnsavedModels =
     !isEditing ||
     (currentType === CHANNEL_TYPE_ADVANCED_CUSTOM && canEditSensitive)
-  const {
-    unlocked: doubaoApiEditUnlocked,
-    handleClick: handleApiConfigSecretClick,
-    reset: resetDoubaoApiUnlock,
-  } = useHiddenClickUnlock({
-    requiredClicks: 10,
-    disabled: currentType !== 45 || sensitiveLocked,
-    onUnlock: () => {
-      toast.info(t('Doubao custom API address editing unlocked'))
-    },
-  })
-
-  useEffect(() => {
-    if (!open) {
-      resetDoubaoApiUnlock()
-    }
-  }, [open, resetDoubaoApiUnlock])
 
   const applyConnectionInfo = useCallback(
     (connectionInfo: ChannelConnectionInfo) => {
@@ -949,16 +930,15 @@ export function ChannelMutateDrawer({
     formErrors.other ||
     formErrors.multi_key_mode ||
     formErrors.multi_key_type ||
-    formErrors.key_mode ||
-    formErrors.azure_responses_version
+    formErrors.key_mode
   )
   const modelsHaveErrors = Boolean(
     formErrors.models || formErrors.group || formErrors.model_mapping
   )
   const advancedHaveErrors =
     hasAdvancedSettingsErrors(formErrors) || Boolean(formErrors.advanced_custom)
-  const providerRequiresBaseUrl = [3, 8, 45].includes(currentType)
-  const providerRequiresOther = [3, 18].includes(currentType)
+  const providerRequiresBaseUrl = [8].includes(currentType)
+  const providerRequiresOther: number[] = []
   const identityComplete = Boolean(currentName?.trim() && currentType > 0)
   const credentialsComplete = Boolean(
     (isEditing || currentKey?.trim()) &&
@@ -1258,36 +1238,6 @@ export function ChannelMutateDrawer({
       initialStatusCodeMappingRef.current = ''
     }
   }, [isEditing, channelData, form])
-
-  // Handle type change - set default values for specific types
-  useEffect(() => {
-    if (isEditing) return // Don't auto-set defaults when editing
-
-    // Type 45 (VolcEngine) - set default base_url
-    if (currentType === 45) {
-      const currentBaseUrlValue = form.getValues('base_url')
-      if (!currentBaseUrlValue || currentBaseUrlValue === '') {
-        form.setValue('base_url', 'https://ark.cn-beijing.volces.com')
-      }
-    }
-
-    // Type 18 (Xunfei) - set default other (version)
-    if (currentType === 18) {
-      const currentOther = form.getValues('other')
-      if (!currentOther || currentOther === '') {
-        form.setValue('other', 'v2.1')
-      }
-    }
-  }, [currentType, isEditing, form])
-
-  useEffect(() => {
-    if (currentType !== 45 || currentBaseUrl !== 'doubao-coding-plan') return
-
-    form.setValue('base_url', 'https://ark.cn-beijing.volces.com', {
-      shouldDirty: false,
-      shouldValidate: true,
-    })
-  }, [currentBaseUrl, currentType, form])
 
   useEffect(() => {
     if (isEditing || supportsMultiKeyAddMode) return
@@ -2123,83 +2073,6 @@ export function ChannelMutateDrawer({
                             disabled={sensitiveLocked}
                             className='space-y-4 disabled:opacity-60'
                           >
-                            {/* Azure (type 3) */}
-                            {currentType === 3 && (
-                              <>
-                                <FormField
-                                  control={form.control}
-                                  name='base_url'
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {t('AZURE_OPENAI_ENDPOINT *')}
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          placeholder={t(
-                                            'e.g., https://docs-test-001.openai.azure.com'
-                                          )}
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                      <FormDescription>
-                                        {t('Your Azure OpenAI endpoint URL')}
-                                      </FormDescription>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='other'
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {t('Default API Version *')}
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          placeholder={t(
-                                            'e.g., 2025-04-01-preview'
-                                          )}
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                      <FormDescription>
-                                        {t(
-                                          'Default API version for this channel'
-                                        )}
-                                      </FormDescription>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='azure_responses_version'
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>
-                                        {t('Responses API Version')}
-                                      </FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          placeholder={t('e.g., preview')}
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                      <FormDescription>
-                                        {t(
-                                          'Default Responses API version, if empty, will use the API version above'
-                                        )}
-                                      </FormDescription>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </>
-                            )}
-
                             {/* Custom (type 8) */}
                             {currentType === 8 && (
                               <FormField
@@ -2232,148 +2105,8 @@ export function ChannelMutateDrawer({
                               />
                             )}
 
-                            {/* Xunfei/Spark (type 18) */}
-                            {currentType === 18 && (
-                              <FormField
-                                control={form.control}
-                                name='other'
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>
-                                      {t('Model Version *')}
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        placeholder={t('e.g., v2.1')}
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                    <FormDescription>
-                                      {t(
-                                        'Spark model version, e.g., v2.1 (version number in API URL)'
-                                      )}
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            )}
-
-                            {/* SiliconFlow (type 40) */}
-                            {currentType === 40 && (
-                              <Alert>
-                                <AlertDescription>
-                                  {t('Referral link:')}{' '}
-                                  <a
-                                    href='https://cloud.siliconflow.cn/i/hij0YNTZ'
-                                    target='_blank'
-                                    rel='noopener noreferrer'
-                                    className='text-primary underline'
-                                  >
-                                    {t(
-                                      'https://cloud.siliconflow.cn/i/hij0YNTZ'
-                                    )}
-                                  </a>
-                                </AlertDescription>
-                              </Alert>
-                            )}
-
-                            {/* VolcEngine (type 45) */}
-                            {currentType === 45 && !doubaoApiEditUnlocked && (
-                              <FormField
-                                control={form.control}
-                                name='base_url'
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel
-                                      className='cursor-pointer select-none'
-                                      onClick={handleApiConfigSecretClick}
-                                    >
-                                      {t('API Base URL *')}
-                                    </FormLabel>
-                                    <Select
-                                      items={[
-                                        {
-                                          value:
-                                            'https://ark.cn-beijing.volces.com',
-                                          label: t(
-                                            'https://ark.cn-beijing.volces.com'
-                                          ),
-                                        },
-                                        {
-                                          value:
-                                            'https://ark.ap-southeast.bytepluses.com',
-                                          label: t(
-                                            'https://ark.ap-southeast.bytepluses.com'
-                                          ),
-                                        },
-                                      ]}
-                                      onValueChange={field.onChange}
-                                      value={
-                                        field.value === 'doubao-coding-plan'
-                                          ? 'https://ark.cn-beijing.volces.com'
-                                          : field.value ||
-                                            'https://ark.cn-beijing.volces.com'
-                                      }
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent
-                                        alignItemWithTrigger={false}
-                                      >
-                                        <SelectGroup>
-                                          <SelectItem value='https://ark.cn-beijing.volces.com'>
-                                            {t(
-                                              'https://ark.cn-beijing.volces.com'
-                                            )}
-                                          </SelectItem>
-                                          <SelectItem value='https://ark.ap-southeast.bytepluses.com'>
-                                            {t(
-                                              'https://ark.ap-southeast.bytepluses.com'
-                                            )}
-                                          </SelectItem>
-                                        </SelectGroup>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                      {t('Select the API endpoint region')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            )}
-
-                            {/* VolcEngine (type 45) - Custom API URL (unlocked) */}
-                            {currentType === 45 && doubaoApiEditUnlocked && (
-                              <FormField
-                                control={form.control}
-                                name='base_url'
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>{t('API Base URL *')}</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        placeholder={t(
-                                          'e.g., https://ark.cn-beijing.volces.com'
-                                        )}
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                    <FormDescription>
-                                      {t('Enter custom API endpoint URL')}
-                                    </FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            )}
-
                             {/* General base_url for other types */}
-                            {![3, 8, 45].includes(currentType) && (
+                            {![8].includes(currentType) && (
                               <FormField
                                 control={form.control}
                                 name='base_url'

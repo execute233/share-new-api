@@ -27,26 +27,10 @@ export const CHANNEL_TYPES = {
   0: 'Unknown',
   1: 'OpenAI',
   2: 'MjProxy',
-  3: 'Azure',
   5: 'MjProxyPlus',
   8: 'Custom',
   14: 'Anthropic',
-  15: 'Baidu',
-  16: 'Zhipu',
-  17: 'Ali',
-  18: 'Xunfei',
-  19: '360',
-  23: 'Tencent',
   24: 'Gemini',
-  25: 'Moonshot',
-  26: 'Zhipu V4',
-  31: 'LingYiWanWu',
-  35: 'MiniMax',
-  40: 'SiliconFlow',
-  43: 'DeepSeek',
-  44: 'MokaAI',
-  45: 'VolcEngine',
-  46: 'Baidu V2',
   57: 'ChatGPT Subscription (Codex)',
   58: 'Advanced Custom',
   59: 'Sub2API',
@@ -54,8 +38,7 @@ export const CHANNEL_TYPES = {
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
-  1, 14, 24, 43, 3, 60, 58, 40, 25, 17, 26, 15, 46, 23, 18, 45, 31, 35, 19, 8,
-  57, 59, 44, 2, 5,
+  1, 14, 24, 60, 58, 8, 57, 59, 2, 5,
 ]
 
 export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
@@ -357,7 +340,7 @@ export const FIELD_DESCRIPTIONS = {
 // ============================================================================
 
 export const MODEL_FETCHABLE_TYPES = new Set([
-  1, 14, 17, 23, 24, 25, 26, 31, 35, 40, 43, 57, 58, 59, 60,
+  1, 14, 24, 57, 58, 59, 60,
 ])
 
 export const FIELD_PASSTHROUGH_TYPES = new Set([
@@ -385,15 +368,11 @@ export const CLAUDE_FIELD_PASSTHROUGH_TYPES = new Set([
 ])
 
 export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
-  15: 'Format: APIKey|SecretKey',
-  18: 'Format: APPID|APISecret|APIKey',
-  23: 'Format: TokenHub API Key, or legacy AppId|SecretId|SecretKey',
   57: 'Paste Codex OAuth JSON credential (access_token / refresh_token / account_id)',
   59: 'Enter API key for this channel',
   60: 'Enter API key for this channel',
 }
 
 export const CHANNEL_TYPE_WARNINGS: Record<number, string> = {
-  3: 'For channels added after May 10, 2025, no need to remove "." from model names during deployment',
   8: 'If connecting to upstream One API or New API relay projects, use OpenAI type instead unless you know what you are doing',
 }

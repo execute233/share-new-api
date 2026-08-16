@@ -29,11 +29,6 @@ func TestChannelOwnerNameUsesAdaptorChannelName(t *testing.T) {
 			channelType: constant.ChannelTypeCodex,
 			expected:    "codex",
 		},
-		{
-			name:        "azure fallback",
-			channelType: constant.ChannelTypeAzure,
-			expected:    "azure",
-		},
 	}
 
 	for _, tt := range tests {

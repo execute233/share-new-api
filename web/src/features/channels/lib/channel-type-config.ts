@@ -62,17 +62,6 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       keyMinLength: 20,
     },
   },
-  3: {
-    id: 3,
-    name: CHANNEL_TYPES[3],
-    icon: 'azure',
-    requiresRegion: true,
-    hints: {
-      baseUrl: 'Azure OpenAI Endpoint',
-      key: 'Azure API Key',
-      models: 'Deployment names',
-    },
-  },
   14: {
     id: 14,
     name: CHANNEL_TYPES[14],
@@ -90,16 +79,6 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
     hints: {
       key: 'Google API Key',
       models: 'gemini-pro,gemini-pro-vision',
-    },
-  },
-  43: {
-    id: 43,
-    name: CHANNEL_TYPES[43],
-    icon: 'deepseek',
-    defaultBaseUrl: 'https://api.deepseek.com',
-    hints: {
-      key: 'DeepSeek API Key',
-      models: 'deepseek-chat,deepseek-coder',
     },
   },
   58: {

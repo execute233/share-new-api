@@ -192,10 +192,6 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		SupportStreamOptions: false,
 	}
 
-	if channelType == constant.ChannelTypeAzure {
-		channelMeta.ApiVersion = GetAPIVersion(c)
-	}
-
 	channelSetting, ok := common.GetContextKeyType[dto.ChannelSettings](c, constant.ContextKeyChannelSetting)
 	if ok {
 		channelMeta.ChannelSetting = channelSetting
@@ -302,20 +298,10 @@ var streamSupportedChannels = map[int]bool{
 	constant.ChannelTypeOpenAI:         true,
 	constant.ChannelTypeAnthropic:      true,
 	constant.ChannelTypeGemini:         true,
-	constant.ChannelTypeAzure:          true,
-	constant.ChannelTypeVolcEngine:     true,
-	constant.ChannelTypeDeepSeek:       true,
-	constant.ChannelTypeBaiduV2:        true,
-	constant.ChannelTypeZhipu_v4:       true,
-	constant.ChannelTypeAli:            true,
 	constant.ChannelTypeCodex:          true,
-	constant.ChannelTypeMoonshot:       true,
-	constant.ChannelTypeMiniMax:        true,
-	constant.ChannelTypeSiliconFlow:    true,
 	constant.ChannelTypeAdvancedCustom: true,
 	constant.ChannelTypeSub2API:        true,
 	constant.ChannelTypeNewAPI:         true,
-	constant.ChannelTypeTencent:        true,
 }
 
 func GenRelayInfoClaude(c *gin.Context, request dto.Request) *RelayInfo {

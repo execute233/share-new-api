@@ -6,28 +6,13 @@ import (
 
 // 简化的供应商映射规则
 var defaultVendorRules = map[string]string{
-	"gpt":      "OpenAI",
-	"dall-e":   "OpenAI",
-	"o1":       "OpenAI",
-	"o3":       "OpenAI",
-	"claude":   "Anthropic",
-	"gemini":   "Google",
-	"moonshot": "Moonshot",
-	"kimi":     "Moonshot",
-	"chatglm":  "智谱",
-	"glm-":     "智谱",
-	"qwen":     "阿里巴巴",
-	"deepseek": "DeepSeek",
-	"abab":     "MiniMax",
-	"minimax":  "MiniMax",
-	"ernie":    "百度",
-	"spark":    "讯飞",
-	"hunyuan":  "腾讯",
-	"360":      "360",
-	"yi":       "零一万物",
-	"jina":     "Jina",
-	"llama":    "Meta",
-	"doubao":   "字节跳动",
+	"gpt":    "OpenAI",
+	"dall-e": "OpenAI",
+	"o1":     "OpenAI",
+	"o3":     "OpenAI",
+	"claude": "Anthropic",
+	"gemini": "Google",
+	"llama":  "Meta",
 }
 
 // 供应商默认图标映射
@@ -35,21 +20,6 @@ var defaultVendorIcons = map[string]string{
 	"OpenAI":    "OpenAI",
 	"Anthropic": "Claude.Color",
 	"Google":    "Gemini.Color",
-	"Moonshot":  "Moonshot",
-	"智谱":        "Zhipu.Color",
-	"阿里巴巴":      "Qwen.Color",
-	"DeepSeek":  "DeepSeek.Color",
-	"MiniMax":   "Minimax.Color",
-	"百度":        "Wenxin.Color",
-	"讯飞":        "Spark.Color",
-	"腾讯":        "Hunyuan.Color",
-	"360":       "Ai360.Color",
-	"零一万物":      "Yi.Color",
-	"Jina":      "Jina",
-	"字节跳动":      "Doubao.Color",
-	"微软":        "AzureAI",
-	"Microsoft": "AzureAI",
-	"Azure":     "AzureAI",
 }
 
 // initDefaultVendorMapping 简化的默认供应商映射

@@ -52,32 +52,12 @@ export function getChannelTypeIcon(type: number): string {
     58: 'NewAPI', // Advanced Custom
     59: 'Sub2API', // Sub2API
     60: 'NewAPI', // New API
-    3: 'Azure', // Azure
 
     // Anthropic
     14: 'Claude', // Anthropic
 
     // Google family
     24: 'Gemini', // Gemini
-
-    // Chinese providers
-    15: 'Baidu', // Baidu
-    46: 'Baidu', // Baidu V2
-    16: 'Zhipu', // Zhipu
-    26: 'Zhipu', // Zhipu V4
-    17: 'Qwen', // Ali
-    18: 'Spark', // Xunfei
-    23: 'Hunyuan', // Tencent
-    19: 'Ai360', // 360
-    25: 'Moonshot', // Moonshot
-    31: 'Yi', // LingYiWanWu
-    35: 'Minimax', // MiniMax
-    45: 'Volcengine', // VolcEngine
-
-    // Other AI providers
-    43: 'DeepSeek', // DeepSeek
-    40: 'SiliconCloud', // SiliconFlow
-    44: 'OpenAI', // MokaAI
 
     // Image generation
     2: 'Midjourney', // MjProxy

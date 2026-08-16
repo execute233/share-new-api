@@ -15,11 +15,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/relay/channel"
-	"github.com/QuantumNous/new-api/relay/channel/ai360"
-	"github.com/QuantumNous/new-api/relay/channel/lingyiwanwu"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 
-	//"github.com/QuantumNous/new-api/relay/channel/minimax"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -98,54 +95,6 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	switch info.ChannelType {
-	case constant.ChannelTypeAzure:
-		apiVersion := info.ApiVersion
-		if apiVersion == "" {
-			apiVersion = constant.AzureDefaultAPIVersion
-		}
-		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
-		requestURL := strings.Split(info.RequestURLPath, "?")[0]
-		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, apiVersion)
-		task := strings.TrimPrefix(requestURL, "/v1/")
-
-		if info.RelayFormat == types.RelayFormatClaude {
-			task = strings.TrimPrefix(task, "messages")
-			task = "chat/completions" + task
-		}
-
-		// 特殊处理 responses API（包含 compact）
-		if info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact {
-			responsesApiVersion := "preview"
-
-			subUrl := "/openai/v1/responses"
-			if strings.Contains(info.ChannelBaseUrl, "cognitiveservices.azure.com") {
-				subUrl = "/openai/responses"
-				responsesApiVersion = apiVersion
-			}
-
-			if info.ChannelOtherSettings.AzureResponsesVersion != "" {
-				responsesApiVersion = info.ChannelOtherSettings.AzureResponsesVersion
-			}
-
-			// compact 模式追加 /compact
-			if info.RelayMode == relayconstant.RelayModeResponsesCompact {
-				subUrl = subUrl + "/compact"
-			}
-
-			requestURL = fmt.Sprintf("%s?api-version=%s", subUrl, responsesApiVersion)
-			return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
-		}
-
-		model_ := info.UpstreamModelName
-		// 2025年5月10日后创建的渠道不移除.
-		if info.ChannelCreateTime < constant.AzureNoRemoveDotTime {
-			model_ = strings.Replace(model_, ".", "", -1)
-		}
-		// https://github.com/songquanpeng/one-api/issues/67
-		requestURL = fmt.Sprintf("/openai/deployments/%s/%s", model_, task)
-		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
-	//case constant.ChannelTypeMiniMax:
-	//	return minimax.GetRequestURL(info)
 	case constant.ChannelTypeCustom:
 		url := info.ChannelBaseUrl
 		url = strings.Replace(url, "{model}", info.UpstreamModelName, -1)
@@ -162,10 +111,6 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, header)
-	if info.ChannelType == constant.ChannelTypeAzure {
-		header.Set("api-key", info.ApiKey)
-		return nil
-	}
 	if info.ChannelType == constant.ChannelTypeOpenAI && "" != info.Organization {
 		header.Set("OpenAI-Organization", info.Organization)
 	}
@@ -190,7 +135,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if info.ChannelType != constant.ChannelTypeOpenAI && info.ChannelType != constant.ChannelTypeAzure {
+	if info.ChannelType != constant.ChannelTypeOpenAI {
 		request.StreamOptions = nil
 	}
 	isOModel := dto.IsOpenAIReasoningOModel(info.UpstreamModelName)
@@ -453,23 +398,9 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 }
 
 func (a *Adaptor) GetModelList() []string {
-	switch a.ChannelType {
-	case constant.ChannelType360:
-		return ai360.ModelList
-	case constant.ChannelTypeLingYiWanWu:
-		return lingyiwanwu.ModelList
-	default:
-		return ModelList
-	}
+	return ModelList
 }
 
 func (a *Adaptor) GetChannelName() string {
-	switch a.ChannelType {
-	case constant.ChannelType360:
-		return ai360.ChannelName
-	case constant.ChannelTypeLingYiWanWu:
-		return lingyiwanwu.ChannelName
-	default:
-		return ChannelName
-	}
+	return ChannelName
 }

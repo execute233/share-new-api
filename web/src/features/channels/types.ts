@@ -91,7 +91,6 @@ export interface ChannelSettings {
 }
 
 export interface ChannelOtherSettings {
-  azure_responses_version?: string
   allow_service_tier?: boolean
   disable_store?: boolean
   allow_safety_identifier?: boolean

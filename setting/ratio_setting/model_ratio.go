@@ -17,7 +17,6 @@ const (
 
 // modelRatio
 // https://platform.openai.com/docs/models/model-endpoint-compatibility
-// https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Blfmc9dlf
 // https://openai.com/pricing
 // TODO: when a new api is enabled, check the pricing here
 // 1 === $0.002 / 1K tokens
@@ -146,22 +145,8 @@ var defaultModelRatio = map[string]float64{
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
 	"claude-opus-4-1-20250805":                  7.5,
-	"ERNIE-4.0-8K":                              0.120 * RMB,
-	"ERNIE-3.5-8K":                              0.012 * RMB,
-	"ERNIE-3.5-8K-0205":                         0.024 * RMB,
-	"ERNIE-3.5-8K-1222":                         0.012 * RMB,
-	"ERNIE-Bot-8K":                              0.024 * RMB,
-	"ERNIE-3.5-4K-0205":                         0.012 * RMB,
-	"ERNIE-Speed-8K":                            0.004 * RMB,
-	"ERNIE-Speed-128K":                          0.004 * RMB,
-	"ERNIE-Lite-8K-0922":                        0.008 * RMB,
-	"ERNIE-Lite-8K-0308":                        0.003 * RMB,
-	"ERNIE-Tiny-8K":                             0.001 * RMB,
-	"BLOOMZ-7B":                                 0.004 * RMB,
-	"Embedding-V1":                              0.002 * RMB,
 	"bge-large-zh":                              0.002 * RMB,
 	"bge-large-en":                              0.002 * RMB,
-	"tao-8k":                                    0.002 * RMB,
 	"gemini-1.5-pro-latest":                     1.25, // $3.5 / 1M tokens
 	"gemini-1.5-flash-latest":                   0.075,
 	"gemini-2.0-flash":                          0.05,
@@ -182,47 +167,6 @@ var defaultModelRatio = map[string]float64{
 	"gemini-robotics-er-1.5-preview":            0.15,
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
-	"chatglm_turbo":                             0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_pro":                               0.7143,     // ￥0.01 / 1k tokens
-	"chatglm_std":                               0.3572,     // ￥0.005 / 1k tokens
-	"chatglm_lite":                              0.1429,     // ￥0.002 / 1k tokens
-	"glm-4":                                     7.143,      // ￥0.1 / 1k tokens
-	"glm-4v":                                    0.05 * RMB, // ￥0.05 / 1k tokens
-	"glm-4-alltools":                            0.1 * RMB,  // ￥0.1 / 1k tokens
-	"glm-3-turbo":                               0.3572,
-	"glm-4-plus":                                0.05 * RMB,
-	"glm-4-0520":                                0.1 * RMB,
-	"glm-4-air":                                 0.001 * RMB,
-	"glm-4-airx":                                0.01 * RMB,
-	"glm-4-long":                                0.001 * RMB,
-	"glm-4-flash":                               0,
-	"glm-4v-plus":                               0.01 * RMB,
-	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
-	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
-	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
-	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v3.5":                            1.2858, // ￥0.018 / 1k tokens
-	"SparkDesk-v4.0":                            1.2858,
-	"hunyuan":                                   7.143, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
-	// https://platform.lingyiwanwu.com/docs#-计费单元
-	// 已经按照 7.2 来换算美元价格
-	"yi-34b-chat-0205":     0.18,
-	"yi-34b-chat-200k":     0.864,
-	"yi-vl-plus":           0.432,
-	"yi-large":             20.0 / 1000 * RMB,
-	"yi-medium":            2.5 / 1000 * RMB,
-	"yi-vision":            6.0 / 1000 * RMB,
-	"yi-medium-200k":       12.0 / 1000 * RMB,
-	"yi-spark":             1.0 / 1000 * RMB,
-	"yi-large-rag":         25.0 / 1000 * RMB,
-	"yi-large-turbo":       12.0 / 1000 * RMB,
-	"yi-large-preview":     20.0 / 1000 * RMB,
-	"yi-large-rag-preview": 25.0 / 1000 * RMB,
-	"deepseek-chat":        0.27 / 2,
-	"deepseek-coder":       0.27 / 2,
-	"deepseek-reasoner":    0.55 / 2, // 0.55 / 1k tokens
 }
 
 var defaultModelPrice = map[string]float64{

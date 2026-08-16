@@ -252,7 +252,6 @@ export const channelFormSchema = z
     system_prompt: z.string().optional(),
     system_prompt_override: z.boolean().optional(),
     // Type-specific settings (stored in settings JSON)
-    azure_responses_version: z.string().optional(), // Azure specific
     // Field passthrough controls (stored in settings JSON)
     allow_service_tier: z.boolean().optional(), // OpenAI/Anthropic
     disable_store: z.boolean().optional(), // OpenAI only
@@ -268,7 +267,7 @@ export const channelFormSchema = z
   })
   .superRefine((data, ctx) => {
     if (
-      [3, 8, 45, CHANNEL_TYPE_NEW_API].includes(data.type) &&
+      [8, CHANNEL_TYPE_NEW_API].includes(data.type) &&
       !data.base_url?.trim()
     ) {
       addRequiredIssue(
@@ -309,7 +308,7 @@ export const channelFormSchema = z
       }
     }
 
-    if ([3, 18, 21, 39, 41, 49].includes(data.type) && !data.other?.trim()) {
+    if ([21, 39, 41, 49].includes(data.type) && !data.other?.trim()) {
       addRequiredIssue(
         ctx,
         'other',
@@ -394,7 +393,6 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   system_prompt: '',
   system_prompt_override: false,
   // Type-specific settings
-  azure_responses_version: '',
   // Field passthrough controls
   allow_service_tier: false,
   disable_store: false,
@@ -455,7 +453,6 @@ export function transformChannelToFormDefaults(
   }
 
   // Parse type-specific settings from settings field
-  let azureResponsesVersion = ''
   let allowServiceTier = false
   let disableStore = false
   let allowSafetyIdentifier = false
@@ -471,7 +468,6 @@ export function transformChannelToFormDefaults(
   if (channel.settings) {
     try {
       const parsed = JSON.parse(channel.settings)
-      azureResponsesVersion = parsed.azure_responses_version || ''
       allowServiceTier = parsed.allow_service_tier === true
       disableStore = parsed.disable_store === true
       allowSafetyIdentifier = parsed.allow_safety_identifier === true
@@ -526,7 +522,6 @@ export function transformChannelToFormDefaults(
     // Channel extra settings
     ...extraSettings,
     // Type-specific settings
-    azure_responses_version: azureResponsesVersion,
     allow_service_tier: allowServiceTier,
     disable_store: disableStore,
     allow_include_obfuscation: allowIncludeObfuscation,
@@ -584,13 +579,6 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
       // eslint-disable-next-line no-console
       console.error('Failed to parse existing settings:', error)
     }
-  }
-
-  // Add azure_responses_version for Azure channels (type 3)
-  if (formData.type === 3 && formData.azure_responses_version) {
-    settingsObj.azure_responses_version = formData.azure_responses_version
-  } else if ('azure_responses_version' in settingsObj) {
-    delete settingsObj.azure_responses_version
   }
 
   // Field passthrough controls:
