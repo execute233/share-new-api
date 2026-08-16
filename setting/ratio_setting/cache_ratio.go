@@ -22,8 +22,6 @@ var defaultCacheRatio = map[string]float64{
 	"gpt-4o":                              0.5,
 	"gpt-4o-mini-2024-07-18":              0.5,
 	"gpt-4o-mini":                         0.5,
-	"gpt-4o-realtime-preview":             0.5,
-	"gpt-4o-mini-realtime-preview":        0.5,
 	"gpt-4.5-preview":                     0.5,
 	"gpt-4.5-preview-2025-02-27":          0.5,
 	"gpt-4.1":                             0.25,

@@ -150,7 +150,7 @@ func TestGenRelayInfoCapturesRequestReasoningEffort(t *testing.T) {
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", tt.path, nil)
 
-			info, err := GenRelayInfo(ctx, tt.relayFormat, tt.request, nil)
+			info, err := GenRelayInfo(ctx, tt.relayFormat, tt.request)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, info.ReasoningEffort)
 		})
@@ -165,7 +165,7 @@ func TestInitChannelMetaRestoresRequestReasoningEffortForRetry(t *testing.T) {
 		Model:     "gpt-5.6-sol",
 		Reasoning: &dto.Reasoning{Effort: "max"},
 	}
-	info, err := GenRelayInfo(ctx, types.RelayFormatOpenAIResponses, request, nil)
+	info, err := GenRelayInfo(ctx, types.RelayFormatOpenAIResponses, request)
 	require.NoError(t, err)
 
 	info.SetReasoningEffort("high")

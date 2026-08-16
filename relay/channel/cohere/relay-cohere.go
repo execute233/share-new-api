@@ -54,21 +54,6 @@ func requestOpenAI2Cohere(textRequest dto.GeneralOpenAIRequest) *CohereRequest {
 	return &cohereReq
 }
 
-func requestConvertRerank2Cohere(rerankRequest dto.RerankRequest) *CohereRerankRequest {
-	topN := lo.FromPtrOr(rerankRequest.TopN, 1)
-	if topN <= 0 {
-		topN = 1
-	}
-	cohereReq := CohereRerankRequest{
-		Query:           rerankRequest.Query,
-		Documents:       rerankRequest.Documents,
-		Model:           rerankRequest.Model,
-		TopN:            topN,
-		ReturnDocuments: true,
-	}
-	return &cohereReq
-}
-
 func stopReasonCohere2OpenAI(reason string) string {
 	switch reason {
 	case "COMPLETE":
@@ -213,41 +198,5 @@ func cohereHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(jsonResponse)
-	return &usage, nil
-}
-
-func cohereRerankHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
-	}
-	service.CloseResponseBodyGracefully(resp)
-	var cohereResp CohereRerankResponseResult
-	err = json.Unmarshal(responseBody, &cohereResp)
-	if err != nil {
-		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
-	}
-	usage := dto.Usage{}
-	if cohereResp.Meta.BilledUnits.InputTokens == 0 {
-		usage.PromptTokens = info.GetEstimatePromptTokens()
-		usage.CompletionTokens = 0
-		usage.TotalTokens = info.GetEstimatePromptTokens()
-	} else {
-		usage.PromptTokens = cohereResp.Meta.BilledUnits.InputTokens
-		usage.CompletionTokens = cohereResp.Meta.BilledUnits.OutputTokens
-		usage.TotalTokens = cohereResp.Meta.BilledUnits.InputTokens + cohereResp.Meta.BilledUnits.OutputTokens
-	}
-
-	var rerankResp dto.RerankResponse
-	rerankResp.Results = cohereResp.Results
-	rerankResp.Usage = usage
-
-	jsonResponse, err := json.Marshal(rerankResp)
-	if err != nil {
-		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
-	}
-	c.Writer.Header().Set("Content-Type", "application/json")
-	c.Writer.WriteHeader(resp.StatusCode)
-	_, err = c.Writer.Write(jsonResponse)
 	return &usage, nil
 }

@@ -64,7 +64,6 @@ export const STATIC_I18N_KEYS = [
   'Response',
   'Anthropic',
   'Gemini',
-  'Rerank',
   'Image',
   'Embeddings',
   'Video',

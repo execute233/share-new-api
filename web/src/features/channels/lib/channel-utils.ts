@@ -107,7 +107,6 @@ export function getChannelTypeIcon(type: number): string {
 
     // Tools & Platforms
     37: 'Dify', // Dify
-    38: 'Jina', // Jina
     22: 'FastGPT', // FastGPT
     47: 'Xinference', // Xinference
     53: 'OpenAI', // Submodel

@@ -209,28 +209,3 @@ type WanImageParameters struct {
 	Seed      int     `json:"seed,omitempty"`      // 随机数种子，取值范围[0, 2147483647]
 	Strength  float64 `json:"strength,omitempty"`  // 修改幅度 0.0-1.0，默认0.5（部分模型支持）
 }
-
-type AliRerankParameters struct {
-	TopN            *int  `json:"top_n,omitempty"`
-	ReturnDocuments *bool `json:"return_documents,omitempty"`
-}
-
-type AliRerankInput struct {
-	Query     string `json:"query"`
-	Documents []any  `json:"documents"`
-}
-
-type AliRerankRequest struct {
-	Model      string              `json:"model"`
-	Input      AliRerankInput      `json:"input"`
-	Parameters AliRerankParameters `json:"parameters,omitempty"`
-}
-
-type AliRerankResponse struct {
-	Output struct {
-		Results []dto.RerankResponseResult `json:"results"`
-	} `json:"output"`
-	Usage     AliUsage `json:"usage"`
-	RequestId string   `json:"request_id"`
-	AliError
-}

@@ -10,7 +10,6 @@ var ModelList = []string{
 	"gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest",
 	"gemini-2.5-flash-native-audio-latest",
 	// preview version
-	"gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts",
 	"gemini-2.5-flash-image", "gemini-2.5-flash-lite-preview-09-2025",
 	"gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-3.1-pro-preview",
 	"gemini-3.1-pro-preview-customtools", "gemini-3.1-flash-lite-preview",

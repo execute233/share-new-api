@@ -45,7 +45,5 @@ var ModelList = []string{
 	"BAAI/bge-m3",
 	"internlm/internlm2_5-20b-chat",
 	"Qwen/Qwen2-Math-72B-Instruct",
-	"netease-youdao/bce-reranker-base_v1",
-	"BAAI/bge-reranker-v2-m3",
 }
 var ChannelName = "siliconflow"

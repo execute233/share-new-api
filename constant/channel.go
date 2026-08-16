@@ -35,7 +35,6 @@ const (
 	ChannelTypeMiniMax        = 35
 	ChannelTypeSunoAPI        = 36
 	ChannelTypeDify           = 37
-	ChannelTypeJina           = 38
 	ChannelCloudflare         = 39
 	ChannelTypeSiliconFlow    = 40
 	ChannelTypeVertexAi       = 41
@@ -161,7 +160,6 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeMiniMax:        "MiniMax",
 	ChannelTypeSunoAPI:        "SunoAPI",
 	ChannelTypeDify:           "Dify",
-	ChannelTypeJina:           "Jina",
 	ChannelCloudflare:         "Cloudflare",
 	ChannelTypeSiliconFlow:    "SiliconFlow",
 	ChannelTypeVertexAi:       "VertexAI",

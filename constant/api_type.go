@@ -17,7 +17,6 @@ const (
 	APITypeAws
 	APITypeCohere
 	APITypeDify
-	APITypeJina
 	APITypeCloudflare
 	APITypeSiliconFlow
 	APITypeVertexAi

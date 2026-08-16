@@ -228,7 +228,7 @@ const APP_TEMPLATES: Array<
 
 const PROFILE_BY_NAME = (name: string) => {
   const n = name.toLowerCase()
-  if (/embed|rerank/.test(n)) return 'embedding'
+  if (/embed/.test(n)) return 'embedding'
   if (/image|sora|veo|kling|pika|jimeng|dalle|imagen/.test(n)) return 'image'
   if (/whisper|tts|voice|audio/.test(n)) return 'audio'
   if (/o1|o3|o4|reasoning|thinking|deepseek-r/.test(n)) return 'reasoning'

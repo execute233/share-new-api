@@ -31,7 +31,6 @@ const (
 	ErrorTypeClaudeError     ErrorType = "claude_error"
 	ErrorTypeMidjourneyError ErrorType = "midjourney_error"
 	ErrorTypeGeminiError     ErrorType = "gemini_error"
-	ErrorTypeRerankError     ErrorType = "rerank_error"
 	ErrorTypeUpstreamError   ErrorType = "upstream_error"
 )
 

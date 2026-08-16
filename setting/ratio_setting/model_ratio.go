@@ -296,7 +296,6 @@ var defaultModelPrice = map[string]float64{
 	"mj_upload":                      0.05,
 	"sora-2":                         0.3,
 	"sora-2-pro":                     0.5,
-	"gpt-4o-mini-tts":                0.3,
 	"veo-3.0-generate-001":           0.4,
 	"veo-3.0-fast-generate-001":      0.15,
 	"veo-3.1-generate-preview":       0.4,
@@ -304,22 +303,11 @@ var defaultModelPrice = map[string]float64{
 }
 
 var defaultAudioRatio = map[string]float64{
-	"gpt-4o-audio-preview":         16,
-	"gpt-4o-mini-audio-preview":    66.67,
-	"gpt-4o-realtime-preview":      8,
-	"gpt-4o-mini-realtime-preview": 16.67,
-	"gpt-4o-mini-tts":              25,
+	"gpt-4o-audio-preview":      16,
+	"gpt-4o-mini-audio-preview": 66.67,
 }
 
-var defaultAudioCompletionRatio = map[string]float64{
-	"gpt-4o-realtime":      2,
-	"gpt-4o-mini-realtime": 2,
-	"gpt-4o-mini-tts":      1,
-	"tts-1":                0,
-	"tts-1-hd":             0,
-	"tts-1-1106":           0,
-	"tts-1-hd-1106":        0,
-}
+var defaultAudioCompletionRatio = map[string]float64{}
 
 var modelPriceMap = types.NewRWMap[string, float64]()
 var modelRatioMap = types.NewRWMap[string, float64]()

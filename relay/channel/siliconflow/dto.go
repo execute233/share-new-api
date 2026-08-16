@@ -1,7 +1,5 @@
 package siliconflow
 
-import "github.com/QuantumNous/new-api/relaykit/dto"
-
 type SFTokens struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
@@ -9,11 +7,6 @@ type SFTokens struct {
 
 type SFMeta struct {
 	Tokens SFTokens `json:"tokens"`
-}
-
-type SFRerankResponse struct {
-	Results []dto.RerankResponseResult `json:"results"`
-	Meta    SFMeta                     `json:"meta"`
 }
 
 type SFImageRequest struct {

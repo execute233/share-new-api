@@ -32,10 +32,6 @@ const (
 	RelayModeMidjourneyVideo
 	RelayModeMidjourneyEdits
 
-	RelayModeAudioSpeech        // tts
-	RelayModeAudioTranscription // whisper
-	RelayModeAudioTranslation   // whisper
-
 	RelayModeSunoFetch
 	RelayModeSunoFetchByID
 	RelayModeSunoSubmit
@@ -43,11 +39,7 @@ const (
 	RelayModeVideoFetchByID
 	RelayModeVideoSubmit
 
-	RelayModeRerank
-
 	RelayModeResponses
-
-	RelayModeRealtime
 
 	RelayModeGemini
 
@@ -80,16 +72,6 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeResponses
 	} else if strings.HasPrefix(path, "/v1/alpha/search") {
 		relayMode = RelayModeAlphaSearch
-	} else if strings.HasPrefix(path, "/v1/audio/speech") {
-		relayMode = RelayModeAudioSpeech
-	} else if strings.HasPrefix(path, "/v1/audio/transcriptions") {
-		relayMode = RelayModeAudioTranscription
-	} else if strings.HasPrefix(path, "/v1/audio/translations") {
-		relayMode = RelayModeAudioTranslation
-	} else if strings.HasPrefix(path, "/v1/rerank") {
-		relayMode = RelayModeRerank
-	} else if strings.HasPrefix(path, "/v1/realtime") {
-		relayMode = RelayModeRealtime
 	} else if strings.HasPrefix(path, "/v1beta/models") || strings.HasPrefix(path, "/v1/models") {
 		relayMode = RelayModeGemini
 	} else if strings.HasPrefix(path, "/mj") {

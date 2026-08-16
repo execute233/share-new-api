@@ -1,8 +1,6 @@
 package minimax
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,7 +15,6 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 )
 
 type Adaptor struct {
@@ -30,51 +27,6 @@ func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dt
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {
 	adaptor := claude.Adaptor{}
 	return adaptor.ConvertClaudeRequest(c, info, req)
-}
-
-func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	if info.RelayMode != constant.RelayModeAudioSpeech {
-		return nil, errors.New("unsupported audio relay mode")
-	}
-
-	voiceID := request.Voice
-	speed := lo.FromPtrOr(request.Speed, 0.0)
-	outputFormat := request.ResponseFormat
-
-	minimaxRequest := MiniMaxTTSRequest{
-		Model: info.OriginModelName,
-		Text:  request.Input,
-		VoiceSetting: VoiceSetting{
-			VoiceID: voiceID,
-			Speed:   speed,
-		},
-		AudioSetting: &AudioSetting{
-			Format: outputFormat,
-		},
-		OutputFormat: outputFormat,
-	}
-
-	// 同步扩展字段的厂商自定义metadata
-	if len(request.Metadata) > 0 {
-		if err := json.Unmarshal(request.Metadata, &minimaxRequest); err != nil {
-			return nil, fmt.Errorf("error unmarshalling metadata to minimax request: %w", err)
-		}
-	}
-
-	jsonData, err := json.Marshal(minimaxRequest)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling minimax request: %w", err)
-	}
-	if outputFormat != "hex" {
-		outputFormat = "url"
-	}
-
-	c.Set("response_format", outputFormat)
-
-	// Debug: log the request structure
-	// fmt.Printf("MiniMax TTS Request: %s\n", string(jsonData))
-
-	return bytes.NewReader(jsonData), nil
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
@@ -104,10 +56,6 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	return request, nil
 }
 
-func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {
-	return nil, nil
-}
-
 func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.EmbeddingRequest) (any, error) {
 	return request, nil
 }
@@ -121,9 +69,6 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *types.NewAPIError) {
-	if info.RelayMode == constant.RelayModeAudioSpeech {
-		return handleTTSResponse(c, resp, info)
-	}
 	if info.RelayMode == constant.RelayModeImagesGenerations {
 		return miniMaxImageHandler(c, resp, info)
 	}

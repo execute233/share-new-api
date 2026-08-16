@@ -51,8 +51,6 @@ function resolveModelProvider(modelName: string): ModelProvider | null {
       'text-embedding-',
       'omni-moderation',
       'dall-e',
-      'whisper',
-      'tts-',
     ]) ||
     /\bo[134](?:-|$)/.test(model)
   ) {

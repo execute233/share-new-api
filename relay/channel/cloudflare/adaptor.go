@@ -1,7 +1,6 @@
 package cloudflare
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -72,29 +71,8 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 	return channel.DoApiRequest(a, c, info, requestBody)
 }
 
-func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {
-	return request, nil
-}
-
 func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.EmbeddingRequest) (any, error) {
 	return request, nil
-}
-
-func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	// 添加文件字段
-	file, _, err := c.Request.FormFile("file")
-	if err != nil {
-		return nil, errors.New("file is required")
-	}
-	defer file.Close()
-	// 打开临时文件用于保存上传的文件内容
-	requestBody := &bytes.Buffer{}
-
-	// 将上传的文件内容复制到临时文件
-	if _, err := io.Copy(requestBody, file); err != nil {
-		return nil, err
-	}
-	return requestBody, nil
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
@@ -118,10 +96,6 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		} else {
 			usage, err = openai.OaiResponsesHandler(c, info, resp)
 		}
-	case constant.RelayModeAudioTranslation:
-		fallthrough
-	case constant.RelayModeAudioTranscription:
-		err, usage = cfSTTHandler(c, info, resp)
 	}
 	return
 }

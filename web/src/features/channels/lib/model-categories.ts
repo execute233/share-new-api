@@ -37,7 +37,6 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
       'chatgpt-',
       'codex-',
       'dall-e-',
-      'whisper-',
       'omni-moderation-',
       'text-moderation-',
       'text-embedding-ada-',
@@ -50,7 +49,7 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
       'computer-use-preview',
       'sora',
     ],
-    pattern: /(?:^|[/.:])(?:o(?:1|3|4)(?=$|[-.:])|tts-)/,
+    pattern: /(?:^|[/.:])(?:o(?:1|3|4)(?=$|[-.:]))/,
   },
   { name: 'Anthropic', keywords: ['anthropic', 'claude'] },
   {
@@ -118,7 +117,6 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
     keywords: ['cohere', 'command-', 'c4ai-aya', 'aya-'],
     pattern: /(?:^|[/.:])command$/,
   },
-  { name: 'Jina', keywords: ['jinaai', 'jina-'] },
   { name: 'BAAI', keywords: ['baai/', 'bge-'] },
   { name: 'Black Forest Labs', keywords: ['black-forest-labs', 'flux.'] },
   {

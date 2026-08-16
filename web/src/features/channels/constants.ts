@@ -58,7 +58,6 @@ export const CHANNEL_TYPES = {
   35: 'MiniMax',
   36: 'SunoAPI',
   37: 'Dify',
-  38: 'Jina',
   39: 'Cloudflare',
   40: 'SiliconFlow',
   41: 'Vertex AI',
