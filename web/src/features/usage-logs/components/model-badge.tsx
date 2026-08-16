@@ -62,9 +62,6 @@ function resolveModelProvider(modelName: string): ModelProvider | null {
   if (hasAny(['gemini-', 'learnlm-'])) {
     return { icon: 'Gemini.Color', label: 'Gemini' }
   }
-  if (hasAny(['grok-', 'xai-'])) {
-    return { icon: 'Grok.Color', label: 'Grok' }
-  }
   if (hasAny(['deepseek-'])) {
     return { icon: 'DeepSeek.Color', label: 'DeepSeek' }
   }
@@ -107,14 +104,8 @@ function resolveModelProvider(modelName: string): ModelProvider | null {
   if (hasAny(['yi-'])) {
     return { icon: 'Yi.Color', label: 'Yi' }
   }
-  if (hasAny(['mistral-', 'mixtral-'])) {
-    return { icon: 'Mistral.Color', label: 'Mistral' }
-  }
   if (hasAny(['llama-', 'meta-'])) {
     return { icon: 'Meta.Color', label: 'Meta' }
-  }
-  if (hasAny(['command-', 'cohere-'])) {
-    return { icon: 'Cohere.Color', label: 'Cohere' }
   }
 
   return null

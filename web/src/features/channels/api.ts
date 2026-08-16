@@ -544,20 +544,6 @@ export async function fetchModels(data: {
 }
 
 /**
- * Delete an Ollama model from a channel
- */
-export async function deleteOllamaModel(params: {
-  channel_id: number
-  model_name: string
-}): Promise<{ success: boolean; message?: string }> {
-  const res = await api.delete(
-    '/api/channel/ollama/delete',
-    channelActionConfig({ data: params })
-  )
-  return res.data
-}
-
-/**
  * Test all enabled channels
  */
 export async function testAllChannels(): Promise<{
@@ -603,20 +589,6 @@ export async function getEnabledModels(): Promise<{
   data?: string[]
 }> {
   const res = await api.get('/api/channel/models_enabled')
-  return res.data
-}
-
-// ============================================================================
-// Ollama Utilities
-// ============================================================================
-
-/**
- * Check Ollama version for a given channel
- */
-export async function getOllamaVersion(
-  channelId: number
-): Promise<{ success: boolean; message?: string; data?: { version: string } }> {
-  const res = await api.get(`/api/channel/ollama/version/${channelId}`)
   return res.data
 }
 

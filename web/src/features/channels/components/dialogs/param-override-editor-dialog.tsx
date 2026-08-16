@@ -352,54 +352,6 @@ const CLAUDE_CLI_HEADER_PASSTHROUGH_TEMPLATE = buildPassHeadersTemplate(
   CLAUDE_CLI_HEADER_PASSTHROUGH_HEADERS
 )
 
-const AWS_BEDROCK_ANTHROPIC_COMPAT_TEMPLATE = {
-  operations: [
-    {
-      description:
-        'Normalize anthropic-beta header tokens for Bedrock compatibility.',
-      mode: 'set_header',
-      path: 'anthropic-beta',
-      value: {
-        'advanced-tool-use-2025-11-20': 'tool-search-tool-2025-10-19',
-        bash_20241022: null,
-        bash_20250124: null,
-        'code-execution-2025-08-25': null,
-        'compact-2026-01-12': 'compact-2026-01-12',
-        'computer-use-2025-01-24': 'computer-use-2025-01-24',
-        'computer-use-2025-11-24': 'computer-use-2025-11-24',
-        'context-1m-2025-08-07': 'context-1m-2025-08-07',
-        'context-management-2025-06-27': 'context-management-2025-06-27',
-        'effort-2025-11-24': null,
-        'fast-mode-2026-02-01': null,
-        'files-api-2025-04-14': null,
-        'fine-grained-tool-streaming-2025-05-14': null,
-        'interleaved-thinking-2025-05-14': 'interleaved-thinking-2025-05-14',
-        'mcp-client-2025-11-20': null,
-        'mcp-client-2025-04-04': null,
-        'mcp-servers-2025-12-04': null,
-        'output-128k-2025-02-19': null,
-        'structured-output-2024-03-01': null,
-        'prompt-caching-scope-2026-01-05': null,
-        'skills-2025-10-02': null,
-        'structured-outputs-2025-11-13': null,
-        text_editor_20241022: null,
-        text_editor_20250124: null,
-        'token-efficient-tools-2025-02-19': null,
-        'tool-search-tool-2025-10-19': 'tool-search-tool-2025-10-19',
-        'web-fetch-2025-09-10': null,
-        'web-search-2025-03-05': null,
-        'oauth-2025-04-20': null,
-      },
-    },
-    {
-      description:
-        'Remove all tools[*].custom.input_examples before upstream relay.',
-      mode: 'delete',
-      path: 'tools.*.custom.input_examples',
-    },
-  ],
-}
-
 type TemplatePresetConfig = {
   label: string
   kind: 'operations' | 'legacy'
@@ -436,11 +388,6 @@ const TEMPLATE_PRESET_CONFIG: Record<string, TemplatePresetConfig> = {
     label: 'Codex CLI Header Passthrough',
     kind: 'operations',
     payload: CODEX_CLI_HEADER_PASSTHROUGH_TEMPLATE,
-  },
-  aws_bedrock_anthropic_beta_override: {
-    label: 'AWS Bedrock Claude Compat',
-    kind: 'operations',
-    payload: AWS_BEDROCK_ANTHROPIC_COMPAT_TEMPLATE,
   },
 }
 

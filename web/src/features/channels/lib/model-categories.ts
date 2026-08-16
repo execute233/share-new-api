@@ -23,10 +23,9 @@ type ModelCategoryRule = {
   pattern?: RegExp
 }
 
-// Rules are ordered so platform-specific IDs such as Perplexity's Sonar and
-// NVIDIA's Nemotron take precedence over the base Llama/Mixtral family name.
+// Rules are ordered so platform-specific IDs take precedence over the base
+// Llama/Mixtral family name.
 const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
-  { name: 'Perplexity', keywords: ['perplexity', 'sonar-'] },
   { name: 'NVIDIA', keywords: ['nvidia/', 'nvidia.', 'nemotron'] },
   {
     name: 'OpenAI',
@@ -47,25 +46,15 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
       'davinci-',
       'babbage-',
       'computer-use-preview',
-      'sora',
     ],
     pattern: /(?:^|[/.:])(?:o(?:1|3|4)(?=$|[-.:]))/,
   },
   { name: 'Anthropic', keywords: ['anthropic', 'claude'] },
   {
     name: 'Gemini',
-    keywords: [
-      'gemini',
-      'gemma',
-      'learnlm',
-      'imagen',
-      'veo',
-      'nano-banana',
-      'palm-',
-    ],
+    keywords: ['gemini', 'gemma', 'learnlm', 'imagen', 'nano-banana'],
     pattern: /(?:^|[/.:])aqa$/,
   },
-  { name: 'xAI', keywords: ['x-ai/', 'xai/', 'xai-', 'grok'] },
   { name: 'DeepSeek', keywords: ['deepseek'] },
   {
     name: 'Qwen',
@@ -100,23 +89,7 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
   { name: 'InternLM', keywords: ['internlm'] },
   { name: 'StepFun', keywords: ['stepfun', 'step-'] },
   { name: 'MiMo', keywords: ['xiaomi', 'mimo-'] },
-  {
-    name: 'Mistral',
-    keywords: [
-      'mistral',
-      'mixtral',
-      'codestral',
-      'ministral',
-      'pixtral',
-      'magistral',
-    ],
-  },
   { name: 'Meta', keywords: ['meta-llama', 'llama-', 'llama2', 'llama3'] },
-  {
-    name: 'Cohere',
-    keywords: ['cohere', 'command-', 'c4ai-aya', 'aya-'],
-    pattern: /(?:^|[/.:])command$/,
-  },
   { name: 'BAAI', keywords: ['baai/', 'bge-'] },
   { name: 'Black Forest Labs', keywords: ['black-forest-labs', 'flux.'] },
   {
@@ -136,10 +109,6 @@ const MODEL_CATEGORY_RULES: readonly ModelCategoryRule[] = [
   { name: 'Nous Research', keywords: ['nousresearch', 'hermes-'] },
   { name: '360 AI', keywords: ['360gpt', '360zhinao'] },
   { name: 'Midjourney', keywords: ['midjourney', 'mj_', 'mj-', 'swap_face'] },
-  { name: 'Kling', keywords: ['kling'] },
-  { name: 'Vidu', keywords: ['vidu'] },
-  { name: 'Suno', keywords: ['suno'] },
-  { name: 'Jimeng', keywords: ['jimeng'] },
 ]
 
 export function getModelCategory(modelName: string): string {

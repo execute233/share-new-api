@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **iota 断号**：`ChannelType*`/`APIType*` 常量删除后不重编号，后续常量数值前移（同上次协议删除模式）。`ChannelTypeDummy` 必须保留且仍是最后一个常量（`controller/model.go` 的 `init()` 遍历 `1..ChannelTypeDummy`）。
+- **iota 断号**：`ChannelType*`/`APIType*` 常量删除后不重编号，**保留常量的数值保持原样（跳号）**——spec 明确"不做常量重编号压缩（会错位已存 DB 的 type 值）"。`ChannelBaseURLs` 数组保持 61 项占位。`ChannelTypeDummy` 必须保留且仍是最后一个常量（`controller/model.go` 的 `init()` 遍历 `1..ChannelTypeDummy`）。
 - **保留渠道**：OpenAI、Azure、Anthropic、Gemini、Baidu、BaiduV2、Zhipu、ZhipuV4、Ali、Xunfei、Tencent、MiniMax、Moonshot、DeepSeek、SiliconFlow、MokaAI、VolcEngine、AdvancedCustom、Codex、NewAPI、Sub2API、Custom。`relay/channel/ai360/`、`relay/channel/lingyiwanwu/` 死目录**不删**（用户未选）。
 - **Midjourney 功能保留**：`relay/mjproxy_handler.go`、`RelayModeMidjourney*`、`/mj` 路由、`GetUserMidjourney`/`GetAllMidjourney`、`controller/midjourney.go`、`service/midjourney.go`、`model/midjourney.go`、`TaskPlatformMidjourney` 全部保留。只删 `ChannelTypeMidjourney`/`ChannelTypeMidjourneyPlus` 常量及其引用。
 - **`tasks` 表与 Task 模型保留**：`model/task.go` 的 `Task` 结构体及 `InitTask`/`GetByTaskId` 等方法保留（`middleware/distributor.go:409` 用 `GetByTaskId` 解析模型名）。
@@ -44,7 +44,7 @@
 - 删除历史死常量：`ChannelTypeMidjourney(2)`、`ChannelTypeMidjourneyPlus(5)`、`ChannelTypeOpenAIMax(6)`、`ChannelTypeOhMyGPT(7)`、`ChannelTypeAILS(9)`、`ChannelTypeAIProxy(10)`、`ChannelTypeAPI2GPT(12)`、`ChannelTypeAIGC2D(13)`、`ChannelTypeAIProxyLibrary(21)`、`ChannelTypeFastGPT(22)`
 - **明确保留**（死目录/常量用户未选删除）：`ChannelTypeUnknown`、`ChannelTypeOpenAI`、`ChannelTypeAzure`、`ChannelTypeOllama(4)`、`ChannelTypeCustom`、`ChannelTypeAnthropic`、`ChannelTypeBaidu`、`ChannelTypeZhipu`、`ChannelTypeAli`、`ChannelTypeXunfei`、`ChannelType360(19)`、`ChannelTypeTencent`、`ChannelTypeGemini`、`ChannelTypeMoonshot`、`ChannelTypeZhipu_v4`、`ChannelTypeLingYiWanWu(31)`、`ChannelTypeMiniMax`、`ChannelTypeSiliconFlow`、`ChannelTypeMokaAI`、`ChannelTypeVolcEngine`、`ChannelTypeBaiduV2`、`ChannelTypeCodex`、`ChannelTypeAdvancedCustom`、`ChannelTypeSub2API`、`ChannelTypeNewAPI`、`ChannelTypeDummy`
 - 先执行 `findstr /s /n "ChannelTypeLingYiWanWu\|ChannelType360\|ChannelTypeOllama" *.go` 确认保留常量引用点
-- `ChannelBaseURLs`：删除常量对应位置的 URL 条目（数组元素删除后索引自动前移，与 iota 一致）；`ChannelTypeNames` map 删除对应条目
+- `ChannelBaseURLs`：**保留数组全部 61 项（索引与原始 ChannelType 数值一一对应），被删位置置空字符串 "" 占位，保留位置维持原 URL 不变**；`ChannelTypeNames` map 删除对应条目（保留项的 key 数值不变）
 
 - [ ] **Step 2: 删除 APIType 常量与映射**
 

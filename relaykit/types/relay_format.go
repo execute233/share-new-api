@@ -12,6 +12,5 @@ const (
 	RelayFormatOpenAIImage                           = "openai_image"
 	RelayFormatEmbedding                             = "embedding"
 
-	RelayFormatTask    = "task"
 	RelayFormatMjProxy = "mj_proxy"
 )

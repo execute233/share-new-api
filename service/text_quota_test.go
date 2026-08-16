@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -443,117 +442,6 @@ func TestCalculateTextQuotaSummaryBillsOpenAICacheWriteTokens(t *testing.T) {
 		// max(3619-2921-3616, 0) + 2921*0.1 + 3616*1.25 + 36*2 = 4884.1 => 4884
 		require.Equal(t, 4884, summary.Quota)
 	})
-}
-
-func TestCalculateTextQuotaSummarySeparatesOpenRouterCacheReadFromPromptBilling(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-
-	relayInfo := &relaycommon.RelayInfo{
-		OriginModelName: "openai/gpt-4.1",
-		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType: constant.ChannelTypeOpenRouter,
-		},
-		PriceData: hosttypes.PriceData{
-			ModelRatio:         1,
-			CompletionRatio:    1,
-			CacheRatio:         0.1,
-			CacheCreationRatio: 1.25,
-			GroupRatioInfo:     hosttypes.GroupRatioInfo{GroupRatio: 1},
-		},
-		StartTime: time.Now(),
-	}
-
-	usage := &dto.Usage{
-		PromptTokens:     2604,
-		CompletionTokens: 383,
-		PromptTokensDetails: dto.InputTokenDetails{
-			CachedTokens: 2432,
-		},
-	}
-
-	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
-
-	// OpenRouter OpenAI-format display keeps prompt_tokens as total input,
-	// but billing still separates normal input from cache read tokens.
-	// quota = (2604 - 2432) + 2432*0.1 + 383 = 798.2 => 798
-	require.Equal(t, 2604, summary.PromptTokens)
-	require.Equal(t, 798, summary.Quota)
-}
-
-func TestCalculateTextQuotaSummarySeparatesOpenRouterCacheCreationFromPromptBilling(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-
-	relayInfo := &relaycommon.RelayInfo{
-		OriginModelName: "openai/gpt-4.1",
-		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType: constant.ChannelTypeOpenRouter,
-		},
-		PriceData: hosttypes.PriceData{
-			ModelRatio:         1,
-			CompletionRatio:    1,
-			CacheCreationRatio: 1.25,
-			GroupRatioInfo:     hosttypes.GroupRatioInfo{GroupRatio: 1},
-		},
-		StartTime: time.Now(),
-	}
-
-	usage := &dto.Usage{
-		PromptTokens:     2604,
-		CompletionTokens: 383,
-		PromptTokensDetails: dto.InputTokenDetails{
-			CachedCreationTokens: 100,
-		},
-	}
-
-	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
-
-	// prompt_tokens is still logged as total input, but cache creation is billed separately.
-	// quota = (2604 - 100) + 100*1.25 + 383 = 3012
-	require.Equal(t, 2604, summary.PromptTokens)
-	require.Equal(t, 3012, summary.Quota)
-}
-
-func TestCalculateTextQuotaSummaryKeepsPrePRClaudeOpenRouterBilling(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-
-	relayInfo := &relaycommon.RelayInfo{
-		FinalRequestRelayFormat: types.RelayFormatClaude,
-		OriginModelName:         "anthropic/claude-3.7-sonnet",
-		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType: constant.ChannelTypeOpenRouter,
-		},
-		PriceData: hosttypes.PriceData{
-			ModelRatio:         1,
-			CompletionRatio:    1,
-			CacheRatio:         0.1,
-			CacheCreationRatio: 1.25,
-			GroupRatioInfo:     hosttypes.GroupRatioInfo{GroupRatio: 1},
-		},
-		StartTime: time.Now(),
-	}
-
-	usage := &dto.Usage{
-		PromptTokens:     2604,
-		CompletionTokens: 383,
-		PromptTokensDetails: dto.InputTokenDetails{
-			CachedTokens: 2432,
-		},
-	}
-
-	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
-
-	// Pre-PR PostClaudeConsumeQuota behavior for OpenRouter:
-	// prompt = 2604 - 2432 = 172
-	// quota = 172 + 2432*0.1 + 383 = 798.2 => 798
-	require.True(t, summary.IsClaudeUsageSemantic)
-	require.Equal(t, 172, summary.PromptTokens)
-	require.Equal(t, 798, summary.Quota)
 }
 
 func TestComposeTieredTextQuotaKeepsToolCallSurcharges(t *testing.T) {

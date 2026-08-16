@@ -98,11 +98,6 @@ export function SidebarModulesCard() {
           title: t('Drawing Logs'),
           description: t('Drawing task records'),
         },
-        {
-          key: 'task',
-          title: t('Task Logs'),
-          description: t('System task records'),
-        },
       ],
     },
     {

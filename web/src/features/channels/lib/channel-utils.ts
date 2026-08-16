@@ -48,8 +48,6 @@ export function getChannelTypeIcon(type: number): string {
   const TYPE_TO_ICON: Record<number, string> = {
     // OpenAI family
     1: 'OpenAI', // OpenAI
-    6: 'OpenAI', // OpenAIMax
-    7: 'OpenAI', // OhMyGPT
     8: 'OpenAI', // Custom
     58: 'NewAPI', // Advanced Custom
     59: 'Sub2API', // Sub2API
@@ -61,12 +59,6 @@ export function getChannelTypeIcon(type: number): string {
 
     // Google family
     24: 'Gemini', // Gemini
-    11: 'Google', // PaLM
-    41: 'Gemini', // Vertex AI
-
-    // Cloud providers
-    33: 'Aws', // AWS
-    39: 'Cloudflare', // Cloudflare
 
     // Chinese providers
     15: 'Baidu', // Baidu
@@ -83,40 +75,13 @@ export function getChannelTypeIcon(type: number): string {
     45: 'Volcengine', // VolcEngine
 
     // Other AI providers
-    4: 'Ollama', // Ollama
-    27: 'Perplexity', // Perplexity
-    34: 'Cohere', // Cohere
-    42: 'Mistral', // Mistral
     43: 'DeepSeek', // DeepSeek
-    48: 'XAI', // xAI
-    49: 'Coze', // Coze
     40: 'SiliconCloud', // SiliconFlow
     44: 'OpenAI', // MokaAI
-    20: 'OpenRouter', // OpenRouter
 
-    // Image/Video generation
+    // Image generation
     2: 'Midjourney', // MjProxy
     5: 'Midjourney', // MjProxyPlus
-    50: 'Kling', // Kling
-    51: 'Jimeng', // Jimeng
-    52: 'Vidu', // Vidu
-    36: 'Suno', // SunoAPI
-    55: 'OpenAI', // Sora
-    54: 'Doubao', // DoubaoVideo
-    56: 'Replicate', // Replicate
-
-    // Tools & Platforms
-    37: 'Dify', // Dify
-    22: 'FastGPT', // FastGPT
-    47: 'Xinference', // Xinference
-    53: 'OpenAI', // Submodel
-
-    // AI Proxy services
-    10: 'OpenAI', // AI Proxy
-    21: 'OpenAI', // AI Proxy Library
-    12: 'OpenAI', // API2GPT
-    13: 'OpenAI', // AIGC2D
-    9: 'OpenAI', // AILS
   }
 
   return TYPE_TO_ICON[type] || 'OpenAI'

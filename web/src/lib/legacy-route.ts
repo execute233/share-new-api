@@ -31,7 +31,6 @@ const legacyConsoleRoutes: Record<string, string> = {
   '/console/personal': '/profile',
   '/console/log': '/usage-logs',
   '/console/midjourney': '/usage-logs/drawing',
-  '/console/task': '/usage-logs/task',
 }
 
 const legacySettingsTabs: Record<string, string> = {

@@ -3,37 +3,21 @@ package constant
 const (
 	APITypeOpenAI = iota
 	APITypeAnthropic
-	APITypePaLM
 	APITypeBaidu
 	APITypeZhipu
 	APITypeAli
 	APITypeXunfei
-	APITypeAIProxyLibrary
 	APITypeTencent
 	APITypeGemini
 	APITypeZhipuV4
-	APITypeOllama
-	APITypePerplexity
-	APITypeAws
-	APITypeCohere
-	APITypeDify
-	APITypeCloudflare
 	APITypeSiliconFlow
-	APITypeVertexAi
-	APITypeMistral
 	APITypeDeepSeek
 	APITypeMokaAI
 	APITypeVolcEngine
 	APITypeBaiduV2
-	APITypeOpenRouter
-	APITypeXinference
-	APITypeXai
-	APITypeCoze
-	APITypeJimeng
+	_ // APITypeJimeng (removed, numbering preserved)
 	APITypeMoonshot
-	APITypeSubmodel
 	APITypeMiniMax
-	APITypeReplicate
 	APITypeCodex
 	APITypeAdvancedCustom
 	APITypeSub2API

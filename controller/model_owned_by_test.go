@@ -30,11 +30,6 @@ func TestChannelOwnerNameUsesAdaptorChannelName(t *testing.T) {
 			expected:    "codex",
 		},
 		{
-			name:        "openrouter",
-			channelType: constant.ChannelTypeOpenRouter,
-			expected:    "openrouter",
-		},
-		{
 			name:        "azure fallback",
 			channelType: constant.ChannelTypeAzure,
 			expected:    "azure",

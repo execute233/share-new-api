@@ -172,7 +172,6 @@ const (
 	MsgChannelGetListFailed      = "channel.get_list_failed"
 	MsgChannelGetTagsFailed      = "channel.get_tags_failed"
 	MsgChannelGetKeyFailed       = "channel.get_key_failed"
-	MsgChannelGetOllamaFailed    = "channel.get_ollama_failed"
 	MsgChannelQueryFailed        = "channel.query_failed"
 	MsgChannelNoValidUpstream    = "channel.no_valid_upstream"
 	MsgChannelUpstreamSaturated  = "channel.upstream_saturated"

@@ -65,7 +65,6 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     token: true,
     log: true,
     midjourney: true,
-    task: true,
   },
   personal: {
     enabled: true,

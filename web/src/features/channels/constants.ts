@@ -28,54 +28,25 @@ export const CHANNEL_TYPES = {
   1: 'OpenAI',
   2: 'MjProxy',
   3: 'Azure',
-  4: 'Ollama',
   5: 'MjProxyPlus',
-  // 6: 'OpenAIMax',
-  7: 'OhMyGPT',
   8: 'Custom',
-  // 9: 'AILS',
-  // 10: 'AI Proxy',
-  // 11: 'PaLM',
-  // 12: 'API2GPT',
-  // 13: 'AIGC2D',
   14: 'Anthropic',
   15: 'Baidu',
   16: 'Zhipu',
   17: 'Ali',
   18: 'Xunfei',
   19: '360',
-  20: 'OpenRouter',
-  // 21: 'AI Proxy Library',
-  22: 'FastGPT',
   23: 'Tencent',
   24: 'Gemini',
   25: 'Moonshot',
   26: 'Zhipu V4',
-  27: 'Perplexity',
   31: 'LingYiWanWu',
-  33: 'AWS',
-  34: 'Cohere',
   35: 'MiniMax',
-  36: 'SunoAPI',
-  37: 'Dify',
-  39: 'Cloudflare',
   40: 'SiliconFlow',
-  41: 'Vertex AI',
-  42: 'Mistral',
   43: 'DeepSeek',
   44: 'MokaAI',
   45: 'VolcEngine',
   46: 'Baidu V2',
-  47: 'Xinference',
-  48: 'xAI',
-  49: 'Coze',
-  50: 'Kling',
-  51: 'Jimeng',
-  52: 'Vidu',
-  53: 'Submodel',
-  54: 'DoubaoVideo',
-  55: 'Sora',
-  56: 'Replicate',
   57: 'ChatGPT Subscription (Codex)',
   58: 'Advanced Custom',
   59: 'Sub2API',
@@ -83,9 +54,8 @@ export const CHANNEL_TYPES = {
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
-  1, 14, 33, 24, 43, 3, 41, 48, 60, 58, 42, 34, 20, 4, 40, 27, 25, 17, 26, 15,
-  46, 23, 18, 45, 31, 35, 49, 19, 47, 37, 38, 39, 11, 8, 57, 59, 22, 21, 44, 2,
-  5, 36, 50, 51, 52, 53, 54, 55, 56,
+  1, 14, 24, 43, 3, 60, 58, 40, 25, 17, 26, 15, 46, 23, 18, 45, 31, 35, 19, 8,
+  57, 59, 44, 2, 5,
 ]
 
 export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
@@ -387,8 +357,7 @@ export const FIELD_DESCRIPTIONS = {
 // ============================================================================
 
 export const MODEL_FETCHABLE_TYPES = new Set([
-  1, 4, 14, 17, 20, 23, 24, 25, 26, 27, 31, 34, 35, 40, 42, 43, 47, 48, 57, 58,
-  59, 60,
+  1, 14, 17, 23, 24, 25, 26, 31, 35, 40, 43, 57, 58, 59, 60,
 ])
 
 export const FIELD_PASSTHROUGH_TYPES = new Set([
@@ -418,11 +387,7 @@ export const CLAUDE_FIELD_PASSTHROUGH_TYPES = new Set([
 export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
   15: 'Format: APIKey|SecretKey',
   18: 'Format: APPID|APISecret|APIKey',
-  22: 'Format: APIKey-AppId, e.g., fastgpt-0sp2gtvfdgyi4k30jwlgwf1i-64f335d84283f05518e9e041',
   23: 'Format: TokenHub API Key, or legacy AppId|SecretId|SecretKey',
-  33: 'Format: Ak|Sk|Region',
-  50: 'Format: AccessKey|SecretKey (or just ApiKey if upstream is New API)',
-  51: 'Format: Access Key ID|Secret Access Key',
   57: 'Paste Codex OAuth JSON credential (access_token / refresh_token / account_id)',
   59: 'Enter API key for this channel',
   60: 'Enter API key for this channel',
@@ -431,5 +396,4 @@ export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
 export const CHANNEL_TYPE_WARNINGS: Record<number, string> = {
   3: 'For channels added after May 10, 2025, no need to remove "." from model names during deployment',
   8: 'If connecting to upstream One API or New API relay projects, use OpenAI type instead unless you know what you are doing',
-  37: 'Dify channels only support chatflow and agent, and agent does not support images',
 }

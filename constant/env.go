@@ -1,7 +1,6 @@
 package constant
 
 var StreamingTimeout int
-var DifyDebug bool
 var MaxFileDownloadMB int
 var StreamScannerMaxBufferMB int
 var ForceStreamOption bool
@@ -16,11 +15,6 @@ var NotifyLimitCount int
 var NotificationLimitDurationMinute int
 var GenerateDefaultToken bool
 var ErrorLogEnabled bool
-var TaskQueryLimit int
-var TaskTimeoutMinutes int
-
-// temporary variable for sora patch, will be removed in future
-var TaskPricePatches []string
 
 // TrustedRedirectDomains is a list of trusted domains for redirect URL validation.
 // Domains support subdomain matching (e.g., "example.com" matches "sub.example.com").
