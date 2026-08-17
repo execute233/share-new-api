@@ -123,13 +123,6 @@ subscription.purchase_max: "Purchase limit for this plan has been reached"
 subscription.invalid_id: "Invalid subscription ID"
 subscription.invalid_user_id: "Invalid user ID"
 
-# Topup messages
-topup.not_provided: "Payment order number not provided"
-topup.order_not_exists: "Top-up order does not exist"
-topup.order_status: "Top-up order status error"
-topup.failed: "Top-up failed, please try again later"
-topup.invalid_quota: "Invalid top-up quota"
-
 # Channel messages
 channel.not_exists: "Channel does not exist"
 channel.id_format_error: "Channel ID format error"

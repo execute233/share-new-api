@@ -124,13 +124,6 @@ subscription.purchase_max: "已达到该套餐购买上限"
 subscription.invalid_id: "无效的订阅ID"
 subscription.invalid_user_id: "无效的用户ID"
 
-# Topup messages
-topup.not_provided: "未提供支付单号"
-topup.order_not_exists: "充值订单不存在"
-topup.order_status: "充值订单状态错误"
-topup.failed: "充值失败，请稍后重试"
-topup.invalid_quota: "无效的充值额度"
-
 # Channel messages
 channel.not_exists: "渠道不存在"
 channel.id_format_error: "渠道ID格式错误"

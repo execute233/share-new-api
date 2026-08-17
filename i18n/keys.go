@@ -140,15 +140,6 @@ const (
 	MsgSubscriptionInvalidUserId    = "subscription.invalid_user_id"
 )
 
-// Topup related messages
-const (
-	MsgTopupNotProvided    = "topup.not_provided"
-	MsgTopupOrderNotExists = "topup.order_not_exists"
-	MsgTopupOrderStatus    = "topup.order_status"
-	MsgTopupFailed         = "topup.failed"
-	MsgTopupInvalidQuota   = "topup.invalid_quota"
-)
-
 // Channel related messages
 const (
 	MsgChannelNotExists          = "channel.not_exists"
