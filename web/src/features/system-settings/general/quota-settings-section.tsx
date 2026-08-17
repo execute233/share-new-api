@@ -55,7 +55,6 @@ const quotaSchema = z.object({
   PreConsumedQuota: z.coerce.number().min(0),
   QuotaForInviter: z.coerce.number().min(0),
   QuotaForInvitee: z.coerce.number().min(0),
-  TopUpLink: z.string(),
   general_setting: z.object({
     docs_link: z.string(),
   }),
@@ -262,26 +261,6 @@ export function QuotaSettingsSection({
                 )}
               />
             </SettingsFormGridItem>
-
-            <FormField
-              control={form.control}
-              name='TopUpLink'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Top-Up Link')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={t('https://example.com/topup')}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t('External link for users to purchase quota')}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

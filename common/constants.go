@@ -15,7 +15,6 @@ var Version = "v0.0.0"            // this hard coding will be replaced automatic
 var SystemName = "New API"
 var Footer = ""
 var Logo = ""
-var TopUpLink = ""
 
 // var ChatLink = ""
 // var ChatLink2 = ""
@@ -225,11 +224,4 @@ const (
 	ChannelStatusEnabled          = 1 // don't use 0, 0 is the default value!
 	ChannelStatusManuallyDisabled = 2 // also don't use 0
 	ChannelStatusAutoDisabled     = 3
-)
-
-const (
-	TopUpStatusPending = "pending"
-	TopUpStatusSuccess = "success"
-	TopUpStatusFailed  = "failed"
-	TopUpStatusExpired = "expired"
 )

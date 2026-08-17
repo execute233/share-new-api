@@ -106,9 +106,9 @@ export function SidebarModulesCard() {
       description: t('User personal functions'),
       modules: [
         {
-          key: 'topup',
-          title: t('Wallet Management'),
-          description: t('Balance and top-up management'),
+          key: 'wallet',
+          title: t('Wallet'),
+          description: t('Redeem codes and balance'),
         },
         {
           key: 'personal',

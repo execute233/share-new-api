@@ -124,19 +124,6 @@ subscription.purchase_max: "已达到该套餐购买上限"
 subscription.invalid_id: "无效的订阅ID"
 subscription.invalid_user_id: "无效的用户ID"
 
-# Payment messages
-payment.not_configured: "当前管理员未配置支付信息"
-payment.method_not_exists: "支付方式不存在"
-payment.callback_error: "回调地址配置错误"
-payment.create_failed: "创建订单失败"
-payment.start_failed: "拉起支付失败"
-payment.amount_too_low: "套餐金额过低"
-payment.stripe_not_configured: "Stripe 未配置或密钥无效"
-payment.webhook_not_configured: "Webhook 未配置"
-payment.price_id_not_configured: "该套餐未配置 StripePriceId"
-payment.creem_not_configured: "该套餐未配置 CreemProductId"
-payment.compliance_required: "支付、兑换码、订阅计划和邀请返利功能已禁用。管理员需先确认合规声明后方可启用。"
-
 # Topup messages
 topup.not_provided: "未提供支付单号"
 topup.order_not_exists: "充值订单不存在"

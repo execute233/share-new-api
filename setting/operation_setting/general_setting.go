@@ -20,6 +20,8 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// 1 USD 等于多少 CNY（CNY 展示模式）
+	USDExchangeRate float64 `json:"usd_exchange_rate"`
 }
 
 // 默认配置
@@ -30,6 +32,7 @@ var generalSetting = GeneralSetting{
 	QuotaDisplayType:           QuotaDisplayTypeUSD,
 	CustomCurrencySymbol:       "¤",
 	CustomCurrencyExchangeRate: 1.0,
+	USDExchangeRate:            7.3,
 }
 
 func init() {

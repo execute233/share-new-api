@@ -4,7 +4,6 @@ module github.com/QuantumNous/new-api
 go 1.25.1
 
 require (
-	github.com/Calcium-Ion/go-epay v0.0.4
 	github.com/andybalholm/brotli v1.1.1
 	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
 	github.com/bytedance/gopkg v0.1.3
@@ -31,12 +30,9 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
-	github.com/stripe/stripe-go/v81 v81.4.0
-	github.com/thanhpk/randstr v1.0.6
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/tiktoken-go/tokenizer v0.6.2
-	github.com/waffo-com/waffo-go v1.3.2
 	golang.org/x/crypto v0.52.0
 	golang.org/x/image v0.41.0
 	golang.org/x/net v0.55.0
@@ -49,10 +45,7 @@ require (
 	gorm.io/gorm v1.25.2
 )
 
-require (
-	github.com/waffo-com/waffo-pancake-sdk-go v0.3.1
-	gorm.io/driver/clickhouse v0.6.0
-)
+require gorm.io/driver/clickhouse v0.6.0
 
 require (
 	github.com/ClickHouse/ch-go v0.65.0 // indirect
