@@ -51,7 +51,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
   },
   personal: {
     enabled: true,
-    topup: true,
+    wallet: true,
     personal: true,
   },
   admin: {
@@ -103,7 +103,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/usage-logs': { section: 'console', module: 'log' },
   '/usage-logs/common': { section: 'console', module: 'log' },
   '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
-  '/wallet': { section: 'personal', module: 'topup' },
+  '/wallet': { section: 'personal', module: 'wallet' },
   '/profile': { section: 'personal', module: 'personal' },
   '/channels': { section: 'admin', module: 'channel' },
   '/models': { section: 'admin', module: 'models' },
