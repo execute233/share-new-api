@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -281,6 +282,27 @@ func configureProxyTransport(transport *http.Transport, proxyURL *url.URL) error
 			return fmt.Errorf("SOCKS proxy dialer does not support context cancellation")
 		}
 		transport.DialContext = contextDialer.DialContext
+		return nil
+	case "ss":
+		transport.Proxy = nil
+		forwardDialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		method := proxyURL.User.Username()
+		if method == "" {
+			return fmt.Errorf("shadowsocks: proxy URL must include an encryption method")
+		}
+		password, _ := proxyURL.User.Password()
+		port, err := strconv.Atoi(proxyURL.Port())
+		if err != nil {
+			return fmt.Errorf("shadowsocks: proxy URL must include a valid port")
+		}
+		dialer, err := newShadowsocksDialer(method, password, proxyURL.Hostname(), port, forwardDialer)
+		if err != nil {
+			return err
+		}
+		transport.DialContext = dialer.DialContext
 		return nil
 	default:
 		return fmt.Errorf("unsupported proxy scheme")
