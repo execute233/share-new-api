@@ -321,5 +321,9 @@ func runProxyProbe(c *gin.Context, quality bool) {
 		return
 	}
 	recordManageAudit(c, "proxy.quality_check", map[string]interface{}{"id": id, "quality": quality})
-	common.ApiSuccess(c, proxySummary(proxy))
+	summary := proxySummary(proxy)
+	if quality {
+		summary.QualityItems = result.Items
+	}
+	common.ApiSuccess(c, summary)
 }

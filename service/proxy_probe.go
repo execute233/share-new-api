@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 )
 
 const proxyProbeMaxBodyBytes = 256 * 1024
@@ -26,6 +27,7 @@ type ProxyProbeResult struct {
 	QualityGrade  string
 	Summary       string
 	Error         string
+	Items         []model.ProxyQualityItem
 }
 
 type ProxyProbe interface {
@@ -84,8 +86,9 @@ func (DefaultProxyProbe) Probe(ctx context.Context, resolved ResolvedProxy, qual
 
 	passed, warned, failed, challenged := 1, 0, 0, 0
 	for _, target := range defaultProxyQualityTargets {
-		status := probeQualityTarget(ctx, client, target)
-		switch status {
+		item := probeQualityTarget(ctx, client, target)
+		result.Items = append(result.Items, item)
+		switch item.Status {
 		case "pass":
 			passed++
 		case "warn":
@@ -143,6 +146,7 @@ func probeExitInfo(ctx context.Context, client *http.Client) ProxyProbeResult {
 			if err := common.Unmarshal(body, &payload); err == nil && strings.EqualFold(payload.Status, "success") && payload.Query != "" {
 				last.IPAddress, last.City, last.Region, last.Country, last.CountryCode = payload.Query, payload.City, payload.RegionName, payload.Country, payload.CountryCode
 				last.Error = ""
+				last.Items = append(last.Items, baseConnectivityItem("pass", last.HTTPStatus, last.LatencyMS, "代理出口连通正常"))
 				return last
 			}
 		} else {
@@ -152,6 +156,7 @@ func probeExitInfo(ctx context.Context, client *http.Client) ProxyProbeResult {
 			if err := common.Unmarshal(body, &payload); err == nil && payload.IP != "" {
 				last.IPAddress = payload.IP
 				last.Error = ""
+				last.Items = append(last.Items, baseConnectivityItem("pass", last.HTTPStatus, last.LatencyMS, "代理出口连通正常"))
 				return last
 			}
 		}
@@ -161,36 +166,60 @@ func probeExitInfo(ctx context.Context, client *http.Client) ProxyProbeResult {
 		last.Error = "proxy connection failed"
 	}
 	last.QualityStatus, last.QualityScore, last.QualityGrade = "failed", 78, "B"
+	last.Items = append(last.Items, baseConnectivityItem("fail", last.HTTPStatus, last.LatencyMS, last.Error))
 	return last
 }
 
-func probeQualityTarget(ctx context.Context, client *http.Client, target proxyQualityTarget) string {
+func baseConnectivityItem(status string, httpStatus, latencyMS int, message string) model.ProxyQualityItem {
+	return model.ProxyQualityItem{Target: "base_connectivity", Status: status, HTTPStatus: httpStatus, LatencyMS: latencyMS, Message: message}
+}
+
+func probeQualityTarget(ctx context.Context, client *http.Client, target proxyQualityTarget) model.ProxyQualityItem {
+	item := model.ProxyQualityItem{Target: target.name, URL: target.url}
+	started := time.Now()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.url, nil)
 	if err != nil {
-		return "fail"
+		item.Status = "fail"
+		item.Message = "创建探测请求失败"
+		return item
 	}
 	req.Header.Set("Accept", "application/json,text/html,*/*")
 	req.Header.Set("User-Agent", "new-api-proxy-quality/1.0")
 	resp, err := client.Do(req)
+	item.LatencyMS = int(time.Since(started).Milliseconds())
 	if err != nil {
-		return "fail"
+		item.Status = "fail"
+		item.Message = fmt.Sprintf("探测请求失败: %v", err)
+		return item
 	}
+	item.HTTPStatus = resp.StatusCode
+	item.CFRay = resp.Header.Get("CF-Ray")
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	_ = resp.Body.Close()
 	lowerBody := strings.ToLower(string(body))
-	if resp.StatusCode == http.StatusForbidden && (resp.Header.Get("CF-Ray") != "" || strings.Contains(lowerBody, "cloudflare") || strings.Contains(lowerBody, "challenge")) {
-		return "challenge"
+	if resp.StatusCode == http.StatusForbidden && (item.CFRay != "" || strings.Contains(lowerBody, "cloudflare") || strings.Contains(lowerBody, "challenge")) {
+		item.Status = "challenge"
+		item.Message = "目标返回 Cloudflare 挑战"
+		return item
 	}
 	if _, ok := target.allowed[resp.StatusCode]; ok {
-		return "pass"
+		item.Status = "pass"
+		item.Message = "目标可达"
+		return item
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return "pass"
+		item.Status = "pass"
+		item.Message = "目标可达"
+		return item
 	}
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return "warn"
+		item.Status = "warn"
+		item.Message = "目标被限流"
+		return item
 	}
-	return "fail"
+	item.Status = "fail"
+	item.Message = fmt.Sprintf("目标不可达 (HTTP %d)", resp.StatusCode)
+	return item
 }
 
 func proxyProbeFailure(message string) ProxyProbeResult {

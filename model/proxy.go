@@ -81,6 +81,19 @@ type ProxySummary struct {
 	BoundChannelCount       int64  `json:"bound_channel_count"`
 	LastHTTPStatus          *int   `json:"last_http_status,omitempty"`
 	LastError               string `json:"last_error,omitempty"`
+	QualityItems            []ProxyQualityItem `json:"quality_items,omitempty"`
+}
+
+// ProxyQualityItem is one AI target's latest quality check result, returned
+// only in the quality-check API response (never persisted).
+type ProxyQualityItem struct {
+	Target     string `json:"target"`
+	URL        string `json:"url,omitempty"`
+	Status     string `json:"status"`
+	HTTPStatus int    `json:"http_status,omitempty"`
+	LatencyMS  int    `json:"latency_ms,omitempty"`
+	Message    string `json:"message,omitempty"`
+	CFRay      string `json:"cf_ray,omitempty"`
 }
 
 func (p *Proxy) BeforeCreate(tx *gorm.DB) error {
