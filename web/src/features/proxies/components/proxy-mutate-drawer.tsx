@@ -45,7 +45,7 @@ import {
 
 import { createProxy, updateProxy, type ProxySummary } from '../api'
 
-const protocols = ['http', 'https', 'socks5', 'socks5h']
+const protocols = ['http', 'https', 'socks5', 'socks5h', 'ss']
 
 type FormState = {
   name: string
@@ -87,6 +87,13 @@ export function ProxyMutateDrawer(props: {
       : emptyForm
   )
   const [saving, setSaving] = useState(false)
+  const isShadowsocks = form.protocol === 'ss'
+  let usernamePlaceholder = ''
+  if (isShadowsocks) {
+    usernamePlaceholder = 'chacha20-ietf-poly1305'
+  } else if (props.proxy?.credential_configured) {
+    usernamePlaceholder = t('Leave empty to keep current')
+  }
   const update = (key: keyof FormState, value: string) =>
     setForm((current) => ({ ...current, [key]: value }))
   const submit = async () => {
@@ -166,16 +173,14 @@ export function ProxyMutateDrawer(props: {
             />
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='proxy-username'>{t('Username')}</Label>
+            <Label htmlFor='proxy-username'>
+              {isShadowsocks ? t('Encryption method') : t('Username')}
+            </Label>
             <Input
               id='proxy-username'
               value={form.username}
               onChange={(e) => update('username', e.target.value)}
-              placeholder={
-                props.proxy?.credential_configured
-                  ? t('Leave empty to keep current')
-                  : ''
-              }
+              placeholder={usernamePlaceholder}
             />
           </div>
           <div className='space-y-2'>
@@ -192,6 +197,13 @@ export function ProxyMutateDrawer(props: {
               }
             />
           </div>
+          {isShadowsocks && (
+            <p className='text-sm text-muted-foreground'>
+              {t(
+                'For Shadowsocks, the encryption method goes in the first field (e.g. aes-256-gcm, chacha20-ietf-poly1305) and the password in the second. You can also paste a full ss:// URL in quick add.'
+              )}
+            </p>
+          )}
           <div className='space-y-2'>
             <Label htmlFor='proxy-status'>{t('Status')}</Label>
             <Select

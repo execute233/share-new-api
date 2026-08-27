@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, test } from 'vitest'
 
 const { createInstance } = await import('i18next')
@@ -79,5 +80,32 @@ describe('Proxy mutate drawer field labels', () => {
         `"${labelText}" control must not be nested inside the label element`
       ).toBeNull()
     }
+  })
+})
+
+describe('Proxy mutate drawer shadowsocks', () => {
+  test('lists ss protocol option', async () => {
+    renderDrawer()
+    await waitFor(() => {
+      expect(findLabel('Protocol')).toBeTruthy()
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('combobox', { name: 'Protocol' }))
+    expect(await screen.findByRole('option', { name: 'ss' })).toBeTruthy()
+  })
+
+  test('switches username field to encryption method with method placeholder when ss is selected', async () => {
+    renderDrawer()
+    await waitFor(() => {
+      expect(findLabel('Protocol')).toBeTruthy()
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('combobox', { name: 'Protocol' }))
+    await user.click(await screen.findByRole('option', { name: 'ss' }))
+
+    expect(findLabel('Encryption method')).toBeTruthy()
+    expect(
+      screen.getByPlaceholderText('chacha20-ietf-poly1305')
+    ).toBeTruthy()
   })
 })
