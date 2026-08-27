@@ -23,6 +23,17 @@ export interface ProxySummary {
   credential_configured: boolean
   credential_decrypt_failed: boolean
   bound_channel_count: number
+  quality_items?: ProxyQualityItem[]
+}
+
+export interface ProxyQualityItem {
+  target: string
+  url?: string
+  status: 'pass' | 'warn' | 'challenge' | 'fail' | string
+  http_status?: number
+  latency_ms?: number
+  message?: string
+  cf_ray?: string
 }
 
 export interface ProxyListResponse {
