@@ -56,6 +56,7 @@ require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
@@ -137,6 +138,7 @@ require (
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.32.0
 	github.com/QuantumNous/new-api/relaykit v0.0.0
+	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 )
 
 replace github.com/QuantumNous/new-api/relaykit => ./relaykit
