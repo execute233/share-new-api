@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 
 import {
@@ -32,6 +34,7 @@ import {
   type ProxySummary,
 } from './api'
 import { ProxyMutateDrawer } from './components/proxy-mutate-drawer'
+import { QualityReportDialog } from './components/quality-report-dialog'
 
 const queryKey = ['proxies'] as const
 
@@ -106,6 +109,11 @@ export function Proxies() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   const [editing, setEditing] = useState<ProxySummary | null>(null)
+  const [running, setRunning] = useState<{
+    id: number
+    kind: 'test' | 'quality'
+  } | null>(null)
+  const [reportProxy, setReportProxy] = useState<ProxySummary | null>(null)
   const query = useQuery({
     queryKey: [...queryKey, search, status],
     queryFn: () => listProxies({ search, status, p: 1, page_size: 100 }),
@@ -119,6 +127,51 @@ export function Proxies() {
     fn: (id: number) => Promise<unknown>
   ) => {
     await fn(proxy.id)
+    refresh()
+  }
+  const runProxyAction = async (
+    proxy: ProxySummary,
+    kind: 'test' | 'quality',
+    fn: (id: number) => Promise<{
+      success: boolean
+      message?: string
+      data?: ProxySummary
+    }>,
+    errorMessage: string
+  ) => {
+    setRunning({ id: proxy.id, kind })
+    try {
+      const response = await fn(proxy.id)
+      if (!response.success) {
+        throw new Error(response.message || errorMessage)
+      }
+      return response
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : errorMessage)
+      return null
+    } finally {
+      setRunning(null)
+    }
+  }
+  const handleTest = async (proxy: ProxySummary) => {
+    const response = await runProxyAction(proxy, 'test', testProxy, t('Proxy test failed'))
+    if (response) {
+      refresh()
+    }
+  }
+  const handleQualityCheck = async (proxy: ProxySummary) => {
+    const response = await runProxyAction(
+      proxy,
+      'quality',
+      qualityCheckProxy,
+      t('Quality check failed')
+    )
+    if (!response) {
+      return
+    }
+    if (response.data) {
+      setReportProxy(response.data)
+    }
     refresh()
   }
   return (
@@ -222,15 +275,24 @@ export function Proxies() {
                         <Button
                           size='sm'
                           variant='ghost'
-                          onClick={() => void action(proxy, testProxy)}
+                          disabled={running?.id === proxy.id}
+                          onClick={() => void handleTest(proxy)}
                         >
+                          {running?.id === proxy.id && running.kind === 'test' ? (
+                            <Spinner className='mr-1' />
+                          ) : null}
                           {t('Test')}
                         </Button>
                         <Button
                           size='sm'
                           variant='ghost'
-                          onClick={() => void action(proxy, qualityCheckProxy)}
+                          disabled={running?.id === proxy.id}
+                          onClick={() => void handleQualityCheck(proxy)}
                         >
+                          {running?.id === proxy.id &&
+                          running.kind === 'quality' ? (
+                            <Spinner className='mr-1' />
+                          ) : null}
                           {t('Quality')}
                         </Button>
                         <Button
@@ -263,6 +325,15 @@ export function Proxies() {
           open={quickOpen}
           onOpenChange={setQuickOpen}
           onSaved={refresh}
+        />
+        <QualityReportDialog
+          proxy={reportProxy}
+          open={reportProxy !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setReportProxy(null)
+            }
+          }}
         />
       </SectionPageLayout.Content>
     </SectionPageLayout>
