@@ -533,7 +533,7 @@ export async function fetchModels(data: {
   channel_id?: number
   advanced_custom?: string
   header_override?: string
-  proxy?: string
+  proxy_id?: number
 }): Promise<FetchModelsResponse> {
   const res = await api.post(
     '/api/channel/fetch_models',

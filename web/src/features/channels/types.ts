@@ -71,6 +71,17 @@ export const channelSchema = z.object({
     multi_key_mode: 'random',
   }),
   settings: z.string().default('{}'), // other_settings JSON
+  proxy_id: z.number().nullish(),
+  proxy: z
+    .object({
+      id: z.number(),
+      name: z.string(),
+      protocol: z.string(),
+      host: z.string(),
+      port: z.number(),
+      status: z.string(),
+    })
+    .nullish(),
 })
 
 export type Channel = z.infer<typeof channelSchema>

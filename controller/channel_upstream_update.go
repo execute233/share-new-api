@@ -316,7 +316,11 @@ func getFetchModelsResponseBody(method string, requestURL string, channel *model
 			request.Host = headers.Get(name)
 		}
 	}
-	client, err := service.NewProxyHttpClient(channel.GetSetting().Proxy)
+	resolvedProxy, err := service.ResolveChannelProxy(channel)
+	if err != nil {
+		return nil, err
+	}
+	client, err := service.NewProxyHttpClient(resolvedProxy.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +347,11 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 			return nil, fmt.Errorf("获取渠道密钥失败: %w", apiErr)
 		}
 		key = strings.TrimSpace(key)
-		models, err := gemini.FetchGeminiModels(baseURL, key, channel.GetSetting().Proxy)
+		resolvedProxy, err := service.ResolveChannelProxy(channel)
+		if err != nil {
+			return nil, err
+		}
+		models, err := gemini.FetchGeminiModels(baseURL, key, resolvedProxy.URL)
 		if err != nil {
 			return nil, err
 		}

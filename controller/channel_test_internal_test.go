@@ -21,39 +21,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateChannelProxy(t *testing.T) {
-	tests := []struct {
-		name    string
-		proxy   string
-		wantErr bool
-	}{
-		{name: "empty"},
-		{name: "http", proxy: "http://proxy.example:8080"},
-		{name: "https", proxy: "https://proxy.example:8443"},
-		{name: "socks5", proxy: "socks5://proxy.example"},
-		{name: "socks5h", proxy: "socks5h://proxy.example:1080/"},
-		{name: "unsupported", proxy: "ftp://proxy.example", wantErr: true},
-		{name: "path", proxy: "socks5://proxy.example:1080/path", wantErr: true},
-	}
+func TestValidateChannelIgnoresLegacyProxySetting(t *testing.T) {
+	setting, err := common.Marshal(dto.ChannelSettings{Proxy: "ftp://legacy.invalid/path"})
+	require.NoError(t, err)
+	channel := &model.Channel{Type: constant.ChannelTypeOpenAI, Setting: common.GetPointer(string(setting))}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			setting, err := common.Marshal(dto.ChannelSettings{Proxy: test.proxy})
-			require.NoError(t, err)
-			channel := &model.Channel{
-				Type:    constant.ChannelTypeOpenAI,
-				Setting: common.GetPointer(string(setting)),
-			}
-
-			err = validateChannel(channel, false)
-
-			if test.wantErr {
-				require.ErrorContains(t, err, "invalid channel proxy")
-				return
-			}
-			require.NoError(t, err)
-		})
-	}
+	require.NoError(t, validateChannel(channel, false))
 }
 
 func TestValidateChannelRequiresNewAPIBaseURL(t *testing.T) {
@@ -131,7 +104,7 @@ func TestMultiprotocolGatewayEndpointTypes(t *testing.T) {
 	assert.Equal(t, want, common.GetEndpointTypesByChannelType(constant.ChannelTypeSub2API, "gpt-5"))
 }
 
-func TestCopyChannelRejectsInvalidLegacyProxySettings(t *testing.T) {
+func TestCopyChannelIgnoresInvalidLegacyProxySettings(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	settingBytes, err := common.Marshal(dto.ChannelSettings{
 		Proxy: "socks5://proxy.example/legacy-path",
@@ -155,13 +128,13 @@ func TestCopyChannelRejectsInvalidLegacyProxySettings(t *testing.T) {
 
 	CopyChannel(ctx)
 
-	assert.Contains(t, recorder.Body.String(), "invalid channel settings")
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
 	var channelCount int64
 	require.NoError(t, db.Model(&model.Channel{}).Count(&channelCount).Error)
-	assert.Equal(t, int64(1), channelCount)
+	assert.Equal(t, int64(2), channelCount)
 }
 
-func TestDeleteChannelResetsProxyCacheWhenPreReadFails(t *testing.T) {
+func TestDeleteMissingChannelDoesNotResetProxyCache(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	require.NoError(t, db.AutoMigrate(&model.Log{}))
 	service.ResetProxyClientCache()
@@ -181,7 +154,7 @@ func TestDeleteChannelResetsProxyCacheWhenPreReadFails(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"success":true`)
 	afterDelete, err := service.GetHttpClientWithProxy(proxyURL)
 	require.NoError(t, err)
-	assert.NotSame(t, beforeDelete, afterDelete)
+	assert.Same(t, beforeDelete, afterDelete)
 }
 
 func TestDeleteChannelBatchReportsAndAuditsActualDeletedCount(t *testing.T) {

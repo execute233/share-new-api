@@ -24,6 +24,9 @@ func channelHasSensitiveChanges(channel *PatchChannel, origin *model.Channel, re
 	if _, ok := requestData["setting"]; ok && !equalStringPtr(channel.Setting, origin.Setting) {
 		return true
 	}
+	if _, ok := requestData["proxy_id"]; ok && !equalIntPtr(channel.ProxyID, origin.ProxyID) {
+		return true
+	}
 	if _, ok := requestData["other"]; ok && channel.Other != origin.Other {
 		return true
 	}
@@ -68,6 +71,7 @@ var channelSensitiveFields = map[string]struct{}{
 	"header_override":     {},
 	"param_override":      {},
 	"setting":             {},
+	"proxy_id":            {},
 	"other":               {},
 	"settings":            {},
 	"key_mode":            {},
@@ -132,5 +136,6 @@ var channelNonSensitiveFields = map[string]struct{}{
 	"tag":                 {},
 	"remark":              {},
 	"channel_info":        {},
+	"proxy":               {}, // server-populated safe summary
 	"multi_key_mode":      {},
 }

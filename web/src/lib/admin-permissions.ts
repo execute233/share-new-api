@@ -25,6 +25,7 @@ export type AdminCapabilities = AdminPermissionMatrix
 
 export const ADMIN_PERMISSION_RESOURCES = {
   CHANNEL: 'channel',
+  PROXY: 'proxy',
 } as const
 
 export const ADMIN_PERMISSION_ACTIONS = {

@@ -66,7 +66,11 @@ func GetResponseBody(method, url string, channel *model.Channel, headers http.He
 	for k := range headers {
 		req.Header.Add(k, headers.Get(k))
 	}
-	client, err := service.GetHttpClientWithProxy(channel.GetSetting().Proxy)
+	resolvedProxy, err := service.ResolveChannelProxy(channel)
+	if err != nil {
+		return nil, err
+	}
+	client, err := service.GetHttpClientWithProxy(resolvedProxy.URL)
 	if err != nil {
 		return nil, err
 	}

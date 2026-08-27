@@ -64,10 +64,23 @@ func parseStatusFilter(statusParam string) int {
 }
 
 func clearChannelInfo(channel *model.Channel) {
+	attachChannelProxySummary(channel)
 	if channel.ChannelInfo.IsMultiKey {
 		channel.ChannelInfo.MultiKeyDisabledReason = nil
 		channel.ChannelInfo.MultiKeyDisabledTime = nil
 	}
+}
+
+func attachChannelProxySummary(channel *model.Channel) {
+	if channel == nil || channel.ProxyID == nil {
+		return
+	}
+	proxy, err := model.GetProxyByID(*channel.ProxyID)
+	if err != nil {
+		return
+	}
+	summary := proxy.Summary()
+	channel.ProxySummary = &summary
 }
 
 func applyChannelStatusFilter(query *gorm.DB, statusFilter int) *gorm.DB {
@@ -479,6 +492,9 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 	if err := channel.ValidateSettings(); err != nil {
 		return fmt.Errorf("渠道额外设置[channel setting] 格式错误：%s", err.Error())
 	}
+	if err := service.ValidateProxyBinding(channel.ProxyID); err != nil {
+		return fmt.Errorf("invalid channel proxy: %w", err)
+	}
 
 	if channel.Type == constant.ChannelTypeNewAPI && strings.TrimSpace(channel.GetBaseURL()) == "" {
 		return fmt.Errorf("New API channel base URL cannot be empty")
@@ -643,12 +659,11 @@ func DeleteChannel(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	channelName := ""
 	channelProxy := ""
-	channelLookupFailed := false
 	if existing, err := model.GetChannelById(id, false); err == nil && existing != nil {
 		channelName = existing.Name
-		channelProxy = existing.GetSetting().Proxy
-	} else {
-		channelLookupFailed = true
+		if resolved, resolveErr := service.ResolveChannelProxy(existing); resolveErr == nil {
+			channelProxy = resolved.URL
+		}
 	}
 	channel := model.Channel{Id: id}
 	err := channel.Delete()
@@ -657,11 +672,7 @@ func DeleteChannel(c *gin.Context) {
 		return
 	}
 	model.InitChannelCache()
-	if channelLookupFailed {
-		service.ResetProxyClientCache()
-	} else {
-		service.InvalidateProxyClient(channelProxy)
-	}
+	service.InvalidateProxyClient(channelProxy)
 	recordManageAudit(c, "channel.delete", map[string]interface{}{
 		"id":   id,
 		"name": channelName,
@@ -907,12 +918,13 @@ func UpdateChannel(c *gin.Context) {
 		})
 		return
 	}
-	originProxy := originChannel.GetSetting().Proxy
+	originResolvedProxy, _ := service.ResolveChannelProxy(originChannel)
+	_, proxyProvided := requestData["proxy_id"]
 	proxyChanged := false
-	if _, settingProvided := requestData["setting"]; settingProvided {
-		newProxy, _ := service.NormalizeProxyURL(channel.GetSetting().Proxy)
-		normalizedOriginProxy, originProxyErr := service.NormalizeProxyURL(originProxy)
-		proxyChanged = originProxyErr != nil || normalizedOriginProxy != newProxy
+	if proxyProvided {
+		proxyChanged = !equalIntPtr(channel.ProxyID, originChannel.ProxyID)
+	} else {
+		channel.ProxyID = originChannel.ProxyID
 	}
 
 	// Always copy the original ChannelInfo so that fields like IsMultiKey and MultiKeySize are retained.
@@ -991,13 +1003,16 @@ func UpdateChannel(c *gin.Context) {
 		}
 	}
 	err = channel.Update()
+	if err == nil && proxyProvided {
+		err = model.DB.Model(&model.Channel{}).Where("id = ?", channel.Id).Update("proxy_id", channel.ProxyID).Error
+	}
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	model.InitChannelCache()
 	if proxyChanged {
-		service.InvalidateProxyClient(originProxy)
+		service.InvalidateProxyClient(originResolvedProxy.URL)
 	}
 	// 记录变更的字段名（语言无关的字段标识），密钥仅记录"已更换"绝不记录内容。
 	changedFields := make([]string, 0)
@@ -1015,6 +1030,9 @@ func UpdateChannel(c *gin.Context) {
 	}
 	if channel.Key != "" && channel.Key != originChannel.Key {
 		changedFields = append(changedFields, "key")
+	}
+	if proxyChanged {
+		changedFields = append(changedFields, "proxy_id")
 	}
 	recordManageAudit(c, "channel.update", map[string]interface{}{
 		"id":             channel.Id,
@@ -1090,6 +1108,13 @@ func isManageableChannelStatus(status int) bool {
 }
 
 // equalStringPtr 比较两个 *string 是否相等（均为 nil 视为相等）。
+func equalIntPtr(a, b *int) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
 func equalStringPtr(a, b *string) bool {
 	if a == nil && b == nil {
 		return true
@@ -1107,7 +1132,8 @@ type fetchModelsRequest struct {
 	Key            string  `json:"key"`
 	AdvancedCustom *string `json:"advanced_custom"`
 	HeaderOverride *string `json:"header_override"`
-	Proxy          *string `json:"proxy"`
+	ProxyID        *int    `json:"proxy_id"`
+	Proxy          *string `json:"proxy,omitempty"` // legacy request compatibility; ignored by runtime
 }
 
 func buildAdvancedCustomModelPreviewChannel(req fetchModelsRequest) (*model.Channel, error) {
@@ -1166,10 +1192,8 @@ func buildAdvancedCustomModelPreviewChannel(req fetchModelsRequest) (*model.Chan
 		}
 		channel.HeaderOverride = &rawHeaderOverride
 	}
-	if req.Proxy != nil {
-		channelSettings := channel.GetSetting()
-		channelSettings.Proxy = strings.TrimSpace(*req.Proxy)
-		channel.SetSetting(channelSettings)
+	if req.ProxyID != nil {
+		channel.ProxyID = req.ProxyID
 	}
 
 	if err := validateChannel(channel, false); err != nil {
@@ -1217,6 +1241,7 @@ func FetchModels(c *gin.Context) {
 			Type:    req.Type,
 			Key:     key,
 			BaseURL: &baseURL,
+			ProxyID: req.ProxyID,
 		}
 	}
 

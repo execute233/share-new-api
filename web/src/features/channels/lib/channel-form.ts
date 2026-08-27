@@ -41,38 +41,6 @@ import {
 // Form Validation Schema
 // ============================================================================
 
-const SUPPORTED_PROXY_PROTOCOLS = new Set([
-  'http:',
-  'https:',
-  'socks5:',
-  'socks5h:',
-])
-
-function isOptionalProxyURL(value: string | undefined): boolean {
-  const trimmedValue = value?.trim() || ''
-  if (!trimmedValue) return true
-
-  const schemeSeparatorIndex = trimmedValue.indexOf('://')
-  if (schemeSeparatorIndex <= 0) return false
-
-  const authorityAndSuffix = trimmedValue.slice(schemeSeparatorIndex + 3)
-  const suffixIndex = authorityAndSuffix.search(/[/?#]/)
-  if (suffixIndex >= 0 && authorityAndSuffix.slice(suffixIndex) !== '/') {
-    return false
-  }
-
-  try {
-    const parsedURL = new URL(trimmedValue)
-    return (
-      SUPPORTED_PROXY_PROTOCOLS.has(parsedURL.protocol) &&
-      Boolean(parsedURL.hostname) &&
-      parsedURL.port !== '0'
-    )
-  } catch {
-    return false
-  }
-}
-
 export const HTTP_PROTOCOL_AUTO = 'auto'
 export const HTTP_PROTOCOL_HTTP1 = 'http1'
 export const MAX_HTTP2_CONNECTION_SHARDS = 8
@@ -242,10 +210,7 @@ export const channelFormSchema = z
     // Channel extra settings (stored in setting JSON, not sent directly)
     force_format: z.boolean().optional(),
     thinking_to_content: z.boolean().optional(),
-    proxy: z
-      .string()
-      .optional()
-      .refine(isOptionalProxyURL, ERROR_MESSAGES.INVALID_PROXY),
+    proxy_id: z.number().int().positive().optional().nullable(),
     http_protocol: z.enum(['auto', 'http1']).optional(),
     http2_connection_shards: z.number().int().optional(),
     pass_through_body_enabled: z.boolean().optional(),
@@ -386,7 +351,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   // Channel extra settings
   force_format: false,
   thinking_to_content: false,
-  proxy: '',
+  proxy_id: null as number | null,
   http_protocol: HTTP_PROTOCOL_AUTO,
   http2_connection_shards: 1,
   pass_through_body_enabled: false,
@@ -418,10 +383,19 @@ export function transformChannelToFormDefaults(
   channel: Channel
 ): ChannelFormValues {
   // Parse channel extra settings from setting field
-  let extraSettings = {
+  let extraSettings: {
+    force_format: boolean
+    thinking_to_content: boolean
+    proxy_id: number | null
+    http_protocol: 'auto' | 'http1'
+    http2_connection_shards: number
+    pass_through_body_enabled: boolean
+    system_prompt: string
+    system_prompt_override: boolean
+  } = {
     force_format: false,
     thinking_to_content: false,
-    proxy: '',
+    proxy_id: null,
     http_protocol: HTTP_PROTOCOL_AUTO as 'auto' | 'http1',
     http2_connection_shards: 1,
     pass_through_body_enabled: false,
@@ -439,7 +413,7 @@ export function transformChannelToFormDefaults(
       extraSettings = {
         force_format: parsed.force_format || false,
         thinking_to_content: parsed.thinking_to_content || false,
-        proxy: parsed.proxy || '',
+        proxy_id: channel.proxy_id !== undefined ? channel.proxy_id : null,
         http_protocol: protocol,
         http2_connection_shards: protocol === HTTP_PROTOCOL_HTTP1 ? 1 : shards,
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
@@ -449,6 +423,27 @@ export function transformChannelToFormDefaults(
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to parse channel setting:', error)
+      extraSettings = {
+        force_format: false,
+        thinking_to_content: false,
+        proxy_id: channel.proxy_id !== undefined ? channel.proxy_id : null,
+        http_protocol: HTTP_PROTOCOL_AUTO as 'auto' | 'http1',
+        http2_connection_shards: 1,
+        pass_through_body_enabled: false,
+        system_prompt: '',
+        system_prompt_override: false,
+      }
+    }
+  } else {
+    extraSettings = {
+      force_format: false,
+      thinking_to_content: false,
+      proxy_id: channel.proxy_id !== undefined ? channel.proxy_id : null,
+      http_protocol: HTTP_PROTOCOL_AUTO as 'auto' | 'http1',
+      http2_connection_shards: 1,
+      pass_through_body_enabled: false,
+      system_prompt: '',
+      system_prompt_override: false,
     }
   }
 
@@ -543,7 +538,6 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
   const settingObj: Record<string, unknown> = {
     force_format: formData.force_format || false,
     thinking_to_content: formData.thinking_to_content || false,
-    proxy: formData.proxy?.trim() || '',
     pass_through_body_enabled: formData.pass_through_body_enabled || false,
     system_prompt: formData.system_prompt || '',
     system_prompt_override: formData.system_prompt_override || false,
@@ -710,6 +704,7 @@ export function transformFormDataToCreatePayload(formData: ChannelFormValues): {
     header_override: formData.header_override || null,
     settings: buildSettingsJSON(formData),
     other: formData.other || '',
+    proxy_id: formData.proxy_id ?? null,
   }
 
   // Clean up empty strings to null for optional fields
@@ -757,6 +752,7 @@ export function transformFormDataToUpdatePayload(
     header_override: formData.header_override || null,
     settings: buildSettingsJSON(formData),
     other: formData.other || '',
+    proxy_id: formData.proxy_id ?? null,
   }
 
   // Only include key if it was changed (not empty)

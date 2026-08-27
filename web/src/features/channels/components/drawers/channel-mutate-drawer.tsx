@@ -281,7 +281,7 @@ const SENSITIVE_FORM_FIELDS = [
   'advanced_custom',
   'force_format',
   'thinking_to_content',
-  'proxy',
+  'proxy_id',
   'http_protocol',
   'http2_connection_shards',
   'pass_through_body_enabled',
@@ -332,7 +332,7 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.remark?.trim() ||
     values.priority ||
     values.weight ||
-    values.proxy?.trim() ||
+    values.proxy_id ||
     values.system_prompt?.trim() ||
     values.force_format ||
     values.thinking_to_content ||
@@ -741,7 +741,7 @@ export function ChannelMutateDrawer({
   const currentForceFormat = form.watch('force_format')
   const currentThinkingToContent = form.watch('thinking_to_content')
   const currentPassThroughBodyEnabled = form.watch('pass_through_body_enabled')
-  const currentProxy = form.watch('proxy')
+  const currentProxyId = form.watch('proxy_id')
   const currentHttpProtocol = form.watch('http_protocol')
   const currentHttp2ConnectionShards = form.watch('http2_connection_shards')
   const currentSystemPrompt = form.watch('system_prompt')
@@ -989,7 +989,7 @@ export function ChannelMutateDrawer({
     currentForceFormat ||
     currentThinkingToContent ||
     currentPassThroughBodyEnabled ||
-    currentProxy?.trim() ||
+    currentProxyId ||
     currentSystemPrompt?.trim() ||
     currentSystemPromptOverride ||
     (currentHttpProtocol && currentHttpProtocol !== 'auto') ||
@@ -1411,7 +1411,7 @@ export function ChannelMutateDrawer({
       base_url: form.getValues('base_url') || '',
       advanced_custom: form.getValues('advanced_custom'),
       header_override: form.getValues('header_override'),
-      proxy: form.getValues('proxy'),
+      proxy_id: form.getValues('proxy_id') ?? undefined,
     })
     if (response.success && response.data) {
       return response.data
@@ -3460,21 +3460,38 @@ export function ChannelMutateDrawer({
 
                             <FormField
                               control={form.control}
-                              name='proxy'
+                              name='proxy_id'
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>{t('Proxy Address')}</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder={t(
-                                        'socks5://user:pass@host:port'
-                                      )}
-                                      {...field}
-                                    />
-                                  </FormControl>
+                                  <FormLabel>{t('Proxy')}</FormLabel>
+                                  <Select
+                                    items={[
+                                      {
+                                        value: 'none',
+                                        label: t('Direct (No Proxy)'),
+                                      },
+                                    ]}
+                                    value={field.value ? String(field.value) : 'none'}
+                                    onValueChange={(value) => {
+                                      field.onChange(value === 'none' ? null : Number(value))
+                                    }}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent alignItemWithTrigger={false}>
+                                      <SelectGroup>
+                                        <SelectItem value='none'>
+                                          {t('Direct (No Proxy)')}
+                                        </SelectItem>
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
                                   <FormDescription>
                                     {t(
-                                      'Network proxy for this channel (supports HTTP, HTTPS, SOCKS5, and SOCKS5H)'
+                                      'Network proxy for this channel. Configure proxies in the Proxies management page.'
                                     )}
                                   </FormDescription>
                                   <FormMessage />

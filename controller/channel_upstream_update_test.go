@@ -293,7 +293,8 @@ func TestFetchModelsAdvancedCustomEditPreviewUsesSavedKeyAndExplicitClears(t *te
 	require.Empty(t, *cleared.BaseURL)
 	require.NotNil(t, cleared.HeaderOverride)
 	require.Empty(t, *cleared.HeaderOverride)
-	require.Empty(t, cleared.GetSetting().Proxy)
+	// Legacy proxy settings are retained as historical data but no longer drive runtime requests.
+	require.Equal(t, "http://127.0.0.1:1", cleared.GetSetting().Proxy)
 
 	body, err := common.Marshal(req)
 	require.NoError(t, err)

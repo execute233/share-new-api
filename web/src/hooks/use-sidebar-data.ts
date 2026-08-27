@@ -29,6 +29,7 @@ import {
   Radio,
   ServerCog,
   Settings,
+  Globe,
   Ticket,
   User,
   Users,
@@ -121,6 +122,11 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Proxies'),
+            url: '/proxies',
+            icon: Globe,
           },
           {
             title: t('Models'),

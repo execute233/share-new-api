@@ -45,6 +45,12 @@ var auditContentTemplates = map[string]string{
 	"channel.upstream_apply":     "Applied upstream model changes to channel (ID: ${id})",
 	"channel.upstream_apply_all": "Applied upstream model changes to ${count} channels",
 
+	"proxy.create":        "Created proxy ${name} (ID: ${id})",
+	"proxy.update":        "Updated proxy ${name} (ID: ${id})",
+	"proxy.delete":        "Deleted proxy ${name} (ID: ${id}, cleared ${bound_channel_count} channel bindings)",
+	"proxy.quick_add":     "Quick-added proxies from ${count} input lines",
+	"proxy.quality_check": "Checked proxy quality (ID: ${id})",
+
 	"redemption.create": "Created ${count} redemption codes named ${name} (${quota} each)",
 
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",

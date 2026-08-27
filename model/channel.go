@@ -46,6 +46,7 @@ type Channel struct {
 	AutoBan           *int    `json:"auto_ban" gorm:"default:1"`
 	OtherInfo         string  `json:"other_info"`
 	Tag               *string `json:"tag" gorm:"index"`
+	ProxyID           *int    `json:"proxy_id,omitempty" gorm:"index"`
 	Setting           *string `json:"setting" gorm:"type:text"` // 渠道额外设置
 	ParamOverride     *string `json:"param_override" gorm:"type:text"`
 	HeaderOverride    *string `json:"header_override" gorm:"type:text"`
@@ -55,8 +56,9 @@ type Channel struct {
 
 	OtherSettings string `json:"settings" gorm:"column:settings"` // 其他设置，存储azure版本等不需要检索的信息，详见dto.ChannelOtherSettings
 
-	// cache info
-	Keys []string `json:"-" gorm:"-"`
+	// response/cache info
+	ProxySummary *ProxySummary `json:"proxy,omitempty" gorm:"-"`
+	Keys         []string      `json:"-" gorm:"-"`
 }
 
 type ChannelInfo struct {
@@ -961,9 +963,6 @@ func (channel *Channel) ValidateSettings() error {
 		if err != nil {
 			return err
 		}
-	}
-	if _, err := common.ParseProxyURLStrict(channelParams.Proxy); err != nil {
-		return fmt.Errorf("invalid channel proxy: %w", err)
 	}
 	if err := channelParams.ValidateHTTPTransport(); err != nil {
 		return err

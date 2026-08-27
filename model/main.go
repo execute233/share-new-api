@@ -260,6 +260,7 @@ func migrateDB() error {
 
 	err := DB.AutoMigrate(
 		&Channel{},
+		&Proxy{},
 		&Token{},
 		&User{},
 		&UserSession{},
@@ -318,6 +319,7 @@ func migrateDBFast() error {
 		name  string
 	}{
 		{&Channel{}, "Channel"},
+		{&Proxy{}, "Proxy"},
 		{&Token{}, "Token"},
 		{&User{}, "User"},
 		{&UserSession{}, "UserSession"},
