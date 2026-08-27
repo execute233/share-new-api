@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com.
 */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
@@ -56,6 +56,10 @@ export function Wallet(props: WalletProps) {
       setUserLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    fetchUser()
+  }, [fetchUser])
 
   const handleRedeem = useCallback(
     async (code: string): Promise<boolean> => {
