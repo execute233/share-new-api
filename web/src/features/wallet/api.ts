@@ -74,6 +74,6 @@ export async function getUserLogs(
   if (logType !== undefined) {
     params.append('type', logType.toString())
   }
-  const res = await api.get(`/api/user/log?${params.toString()}`)
+  const res = await api.get(`/api/log/self?${params.toString()}`)
   return res.data
 }
