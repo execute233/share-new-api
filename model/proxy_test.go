@@ -32,3 +32,19 @@ func TestProxySummaryDoesNotExposeCredentials(t *testing.T) {
 	assert.Empty(t, summary.CredentialDecryptFailed)
 	assert.Equal(t, "example.com", summary.Host)
 }
+
+func TestProxyProtocolShadowsocks(t *testing.T) {
+	assert.True(t, IsSupportedProxyProtocol("ss"))
+	assert.True(t, IsSupportedProxyProtocol("SS"))
+
+	protocol, host, port, username, password, err := ParseProxyEndpoint("ss://chacha20-ietf-poly1305:secret@proxy.example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "ss", protocol)
+	assert.Equal(t, "proxy.example.com", host)
+	assert.Equal(t, 8388, port)
+	assert.Equal(t, "chacha20-ietf-poly1305", username)
+	assert.Equal(t, "secret", password)
+
+	_, _, _, _, _, err = ParseProxyEndpoint("ss://rc4-md5:secret@proxy.example.com:8388")
+	require.Error(t, err)
+}

@@ -18,6 +18,7 @@ const (
 	ProxyProtocolHTTPS   = "https"
 	ProxyProtocolSOCKS5  = "socks5"
 	ProxyProtocolSOCKS5H = "socks5h"
+	ProxyProtocolSS      = "ss"
 	ProxyStatusActive    = "active"
 	ProxyStatusInactive  = "inactive"
 )
@@ -129,7 +130,7 @@ func (p *Proxy) Validate() error {
 
 func IsSupportedProxyProtocol(protocol string) bool {
 	switch strings.ToLower(strings.TrimSpace(protocol)) {
-	case ProxyProtocolHTTP, ProxyProtocolHTTPS, ProxyProtocolSOCKS5, ProxyProtocolSOCKS5H:
+	case ProxyProtocolHTTP, ProxyProtocolHTTPS, ProxyProtocolSOCKS5, ProxyProtocolSOCKS5H, ProxyProtocolSS:
 		return true
 	default:
 		return false

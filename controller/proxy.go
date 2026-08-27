@@ -276,7 +276,7 @@ func sanitizeProxyInputError(err error) string {
 		return ""
 	}
 	message := err.Error()
-	if strings.Contains(message, "stable") || strings.HasPrefix(message, "proxy URL") {
+	if strings.Contains(message, "stable") || strings.HasPrefix(message, "proxy URL") || strings.Contains(message, "shadowsocks") {
 		return message
 	}
 	return "invalid proxy configuration"
