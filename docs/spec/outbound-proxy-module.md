@@ -62,7 +62,7 @@ relay 和所有渠道相关的上游请求路径统一通过代理解析策略�
 - inactive 代理运行时直连；质量检测失败不会自动切换或修改代理状态。
 - relay 的主解析接缝是渠道选择后的上下文设置过程：初次选路和重试均根据渠道 `proxy_id` 解析代理运行时信息，再由通用 relay request 使用。绕过该接缝的 Gemini、Codex、Midjourney、余额和模型检测路径复用同一代理解析服务。
 - 旧 `setting.proxy` 保留历史值但不再由 relay、渠道表单或上游辅助请求读取；没有 `proxy_id` 的旧渠道直连。
-- 支持显式 `http`、`https`、`socks5`、`socks5h` URL；快速添加按协议、host、port、认证组合去重，并返回逐行脱敏结果。
+- 支持显式 `http`、`https`、`socks5`、`socks5h`、`ss`（shadowsocks）URL；快速添加按协议、host、port、认证组合去重，并返回逐行脱敏结果。`ss` 支持 `ss://method:password@host:port` 明文与 `ss://base64url(method:password)@host:port` 变形，method 白名单为 aes-128-gcm / aes-256-gcm / chacha20-ietf-poly1305（大小写不敏感），端口缺省 8388，目标域名经加密隧道原样发送（远端 DNS）。
 - 首期不提供 JSON 导入导出、代理轮询、备用代理、自动熔断、周期检测或检测历史。
 - 代理凭证使用 AES-GCM 可逆加密，密钥由显式稳定的 `CRYPTO_SECRET` 或 `SESSION_SECRET` 派生。没有稳定 secret 时，无认证代理仍可创建；带用户名或密码的创建/更新被拒绝。API 永不返回明文凭证或密文。
 - 代理列表、详情、渠道详情使用安全 DTO，不直接序列化包含敏感字段的 GORM 模型。
