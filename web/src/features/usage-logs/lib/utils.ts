@@ -19,12 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Utility functions for usage logs feature
  */
-import {
-  getAllLogs,
-  getUserLogs,
-  getAllMidjourneyLogs,
-  getUserMidjourneyLogs,
-} from '../api'
+import { getAllLogs, getUserLogs } from '../api'
 import {
   LOG_TYPES,
   DISPLAYABLE_LOG_TYPES,
@@ -34,7 +29,6 @@ import type {
   GetLogsParams,
   GetLogsResponse,
   FetchLogsConfig,
-  GetMidjourneyLogsParams,
 } from '../types'
 
 // ============================================================================
@@ -270,20 +264,5 @@ export async function fetchLogsByCategory(
     return isAdmin ? await getAllLogs(params) : await getUserLogs(params)
   }
 
-  // For drawing logs
-  const baseParams = buildBaseParams({
-    page,
-    pageSize,
-    searchParams,
-    useMilliseconds: true,
-  })
-
-  const paramsWithFilter = {
-    ...baseParams,
-    mj_id: searchParams.filter as string | undefined,
-  }
-
-  return isAdmin
-    ? await getAllMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
-    : await getUserMidjourneyLogs(paramsWithFilter as GetMidjourneyLogsParams)
+  throw new Error(`Unsupported log category: ${logCategory}`)
 }

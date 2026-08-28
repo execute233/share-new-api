@@ -22,12 +22,10 @@ For commercial licensing, please contact support@quantumnous.com
 import type { ColumnDef } from '@tanstack/react-table'
 
 import { useCommonLogsColumns } from '../components/columns/common-logs-columns'
-import { useDrawingLogsColumns } from '../components/columns/drawing-logs-columns'
 import type { LogCategory } from '../types'
 
 /**
  * Get column definitions based on log category
- * Returns any[] due to different log types (UsageLog, MjProxy log)
  */
 export function useColumnsByCategory(
   logCategory: LogCategory,
@@ -35,13 +33,10 @@ export function useColumnsByCategory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): ColumnDef<any>[] {
   const commonColumns = useCommonLogsColumns(isAdmin)
-  const drawingColumns = useDrawingLogsColumns(isAdmin)
 
   switch (logCategory) {
     case 'common':
       return commonColumns
-    case 'drawing':
-      return drawingColumns
     default:
       return commonColumns
   }
