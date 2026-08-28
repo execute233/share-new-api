@@ -111,6 +111,7 @@ import {
   SecureVerificationDialog,
   useSecureVerification,
 } from '@/features/auth/secure-verification'
+import { listActiveProxies } from '@/features/proxies/api'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import {
   ADMIN_PERMISSION_ACTIONS,
@@ -742,6 +743,27 @@ export function ChannelMutateDrawer({
   const currentThinkingToContent = form.watch('thinking_to_content')
   const currentPassThroughBodyEnabled = form.watch('pass_through_body_enabled')
   const currentProxyId = form.watch('proxy_id')
+
+  // Fetch active proxies from the proxy pool
+  const { data: activeProxiesData } = useQuery({
+    queryKey: ['proxies', 'active'],
+    queryFn: listActiveProxies,
+  })
+
+  const proxySelectItems = useMemo(() => {
+    const items = [{ value: 'none', label: t('Direct (No Proxy)') }]
+    const proxies = activeProxiesData?.data ?? []
+    for (const proxy of proxies) {
+      items.push({ value: String(proxy.id), label: proxy.name })
+    }
+    if (
+      currentProxyId &&
+      !proxies.some((proxy) => proxy.id === currentProxyId)
+    ) {
+      items.push({ value: String(currentProxyId), label: `#${currentProxyId}` })
+    }
+    return items
+  }, [activeProxiesData, currentProxyId, t])
   const currentHttpProtocol = form.watch('http_protocol')
   const currentHttp2ConnectionShards = form.watch('http2_connection_shards')
   const currentSystemPrompt = form.watch('system_prompt')
@@ -3465,12 +3487,7 @@ export function ChannelMutateDrawer({
                                 <FormItem>
                                   <FormLabel>{t('Proxy')}</FormLabel>
                                   <Select
-                                    items={[
-                                      {
-                                        value: 'none',
-                                        label: t('Direct (No Proxy)'),
-                                      },
-                                    ]}
+                                    items={proxySelectItems}
                                     value={field.value ? String(field.value) : 'none'}
                                     onValueChange={(value) => {
                                       field.onChange(value === 'none' ? null : Number(value))
@@ -3483,9 +3500,14 @@ export function ChannelMutateDrawer({
                                     </FormControl>
                                     <SelectContent alignItemWithTrigger={false}>
                                       <SelectGroup>
-                                        <SelectItem value='none'>
-                                          {t('Direct (No Proxy)')}
-                                        </SelectItem>
+                                        {proxySelectItems.map((item) => (
+                                          <SelectItem
+                                            key={item.value}
+                                            value={item.value}
+                                          >
+                                            {item.label}
+                                          </SelectItem>
+                                        ))}
                                       </SelectGroup>
                                     </SelectContent>
                                   </Select>
