@@ -4,7 +4,7 @@
 
 当前 new-api 将渠道出站代理保存为渠道 `setting.proxy` 中的自由字符串。管理员需要在多个渠道间重复填写代理 URL，无法集中管理代理凭证、查看代理绑定关系、批量添加代理，也无法在渠道实际转发前了解代理的连通性、延迟、出口 IP、地理位置和 AI 目标质量。
 
-该方式还使 relay、Gemini、Codex、Midjourney、余额查询和上游模型检测等路径分别读取代理字符串，代理策略分散且难以保证一致性。代理凭证也没有独立的掩码和可逆加密存储边界。
+该方式还使 relay、Gemini、Codex、余额查询和上游模型检测等路径分别读取代理字符串，代理策略分散且难以保证一致性。代理凭证也没有独立的掩码和可逆加密存储边界。
 
 ## 解决方案（Solution）
 
@@ -60,7 +60,7 @@ relay 和所有渠道相关的上游请求路径统一通过代理解析策略�
 - `Channel` 增加可空 `proxy_id`；未绑定用 `NULL` 表示直连。渠道可以绑定 inactive 代理，但新选择器默认只展示 active 代理。
 - 删除代理时在应用事务中先清空关联渠道 `proxy_id`，再删除代理；不依赖数据库特定级联行为。
 - inactive 代理运行时直连；质量检测失败不会自动切换或修改代理状态。
-- relay 的主解析接缝是渠道选择后的上下文设置过程：初次选路和重试均根据渠道 `proxy_id` 解析代理运行时信息，再由通用 relay request 使用。绕过该接缝的 Gemini、Codex、Midjourney、余额和模型检测路径复用同一代理解析服务。
+- relay 的主解析接缝是渠道选择后的上下文设置过程：初次选路和重试均根据渠道 `proxy_id` 解析代理运行时信息，再由通用 relay request 使用。绕过该接缝的 Gemini、Codex、余额和模型检测路径复用同一代理解析服务。
 - 旧 `setting.proxy` 保留历史值但不再由 relay、渠道表单或上游辅助请求读取；没有 `proxy_id` 的旧渠道直连。
 - 支持显式 `http`、`https`、`socks5`、`socks5h`、`ss`（shadowsocks）URL；快速添加按协议、host、port、认证组合去重，并返回逐行脱敏结果。`ss` 支持 `ss://method:password@host:port` 明文与 `ss://base64url(method:password)@host:port` 变形，method 白名单为 aes-128-gcm / aes-256-gcm / chacha20-ietf-poly1305（大小写不敏感），端口缺省 8388，目标域名经加密隧道原样发送（远端 DNS）。
 - 首期不提供 JSON 导入导出、代理轮询、备用代理、自动熔断、周期检测或检测历史。
