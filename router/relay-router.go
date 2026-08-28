@@ -157,4 +157,27 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatGemini)
 		})
 	}
+
+	codexDisguiseRouter := router.Group("/backend-api/codex")
+	codexDisguiseRouter.Use(middleware.RouteTag("relay"))
+	codexDisguiseRouter.Use(middleware.SystemPerformanceCheck())
+	codexDisguiseRouter.Use(middleware.TokenAuth())
+	codexDisguiseRouter.Use(middleware.ModelRequestRateLimit())
+	{
+		httpRouter := codexDisguiseRouter.Group("")
+		httpRouter.Use(middleware.Distribute())
+
+		httpRouter.POST("/responses", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIResponses)
+		})
+		httpRouter.POST("/responses/compact", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIResponsesCompaction)
+		})
+		httpRouter.POST("/alpha/search", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIAlphaSearch)
+		})
+		httpRouter.GET("/models", func(c *gin.Context) {
+			controller.ListModels(c, constant.ChannelTypeCodexDisguise)
+		})
+	}
 }

@@ -33,10 +33,11 @@ export const CHANNEL_TYPES = {
   58: 'Advanced Custom',
   59: 'Sub2API',
   60: 'New API',
+  62: 'Codex Disguise',
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
-  1, 14, 24, 60, 58, 8, 57, 59,
+  1, 14, 24, 60, 58, 8, 57, 59, 62,
 ]
 
 export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
@@ -369,6 +370,7 @@ export const TYPE_TO_KEY_PROMPT: Record<number, string> = {
   57: 'Paste Codex OAuth JSON credential (access_token / refresh_token / account_id)',
   59: 'Enter API key for this channel',
   60: 'Enter API key for this channel',
+  62: 'Paste Codex Disguise JSON key (sub2api api_key / oauth / agent)',
 }
 
 export const CHANNEL_TYPE_WARNINGS: Record<number, string> = {

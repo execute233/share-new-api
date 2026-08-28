@@ -85,6 +85,13 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastRemovedModels  []string              `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
+	// Codex disguise channel settings
+	DisguiseEnabled    *bool  `json:"disguise_enabled,omitempty"`     // nil/true = 伪装开启；false = 退化为纯转发
+	FingerprintMode    string `json:"fingerprint_mode,omitempty"`     // off/device/session/full；空 = session
+	FingerprintSeed    string `json:"fingerprint_seed,omitempty"`     // 渠道级恒定 UUIDv4；空 = 不收敛
+	CodexClientVersion string `json:"codex_client_version,omitempty"` // 手配版本；空 = 编译期兜底
+	EnforceIdentity    *bool  `json:"enforce_identity,omitempty"`     // nil/true = 强制统一；false = 仅配套收口
+	AgentAutoRegister  *bool  `json:"agent_auto_register,omitempty"`  // nil/true = task 失效自动重注册
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {

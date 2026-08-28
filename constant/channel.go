@@ -10,7 +10,8 @@ const (
 	ChannelTypeAdvancedCustom = 58
 	ChannelTypeSub2API        = 59
 	ChannelTypeNewAPI         = 60
-	ChannelTypeDummy          = 61 // this one is only for count, do not add any channel after this
+	ChannelTypeCodexDisguise  = 62 // Codex 伪装渠道（多下游收敛 → sub2api 上游）
+	ChannelTypeDummy          = 63 // this one is only for count, do not add any channel after this
 
 )
 
@@ -76,6 +77,9 @@ var ChannelBaseURLs = []string{
 	"",                                          // 58
 	"",                                          // 59
 	"",                                          // 60
+	"",                                          // 61
+	"",                                          // 62
+	"",                                          // 63
 }
 
 var ChannelTypeNames = map[int]string{
@@ -88,6 +92,7 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeAdvancedCustom: "Advanced Custom",
 	ChannelTypeSub2API:        "Sub2API",
 	ChannelTypeNewAPI:         "New API",
+	ChannelTypeCodexDisguise:  "Codex Disguise",
 }
 
 func GetChannelTypeName(channelType int) string {

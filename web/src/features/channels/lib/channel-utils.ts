@@ -52,6 +52,7 @@ export function getChannelTypeIcon(type: number): string {
     58: 'NewAPI', // Advanced Custom
     59: 'Sub2API', // Sub2API
     60: 'NewAPI', // New API
+    62: 'Codex', // Codex Disguise
 
     // Anthropic
     14: 'Claude', // Anthropic
