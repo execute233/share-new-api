@@ -47,7 +47,6 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     detail: true,
     token: true,
     log: true,
-    midjourney: true,
   },
   personal: {
     enabled: true,
@@ -103,7 +102,6 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/keys': { section: 'console', module: 'token' },
   '/usage-logs': { section: 'console', module: 'log' },
   '/usage-logs/common': { section: 'console', module: 'log' },
-  '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
   '/wallet': { section: 'personal', module: 'wallet' },
   '/profile': { section: 'personal', module: 'personal' },
   '/channels': { section: 'admin', module: 'channel' },

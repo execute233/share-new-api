@@ -110,10 +110,6 @@ export function SidebarModulesSection({
         title: t('Usage logs'),
         description: t('Detailed request logs for investigations.'),
       },
-      midjourney: {
-        title: t('Drawing logs'),
-        description: t('History of MjProxy-style image tasks.'),
-      },
     },
     personal: {
       topup: {
