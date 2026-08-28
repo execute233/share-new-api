@@ -44,3 +44,7 @@ go.work.sum
 
 # Standalone git repositories nested inside this checkout.
 sub2api/
+
+# Codegraph tool artifacts
+.codegraph/
+
