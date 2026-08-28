@@ -1,6 +1,7 @@
 package codexdisguise
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -123,7 +125,6 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 		request.PresencePenalty = nil
 	}
 
-	a.stageCodexFingerprintIDs(c, info)
 	return request, nil
 }
 
@@ -162,10 +163,13 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	version := codexClientVersionFromSettings(info)
 	enforce := codexDisguiseEnforceIdentity(info)
 
-	ensureCodexIdentityHeaders(req, canonicalUA, version)
-	a.applyFingerprintHeaders(c, info, req)
-	a.guardTurnState(c, info, req)
-	enforceCodexIdentityHeaders(req, canonicalUA, version, enforce)
+	if codexDisguiseEnabled(info) {
+		a.stageCodexFingerprintIDs(c, info)
+		ensureCodexIdentityHeaders(req, canonicalUA, version)
+		a.applyFingerprintHeaders(c, info, req)
+		a.guardTurnState(c, info, req)
+		enforceCodexIdentityHeaders(req, canonicalUA, version, enforce)
+	}
 
 	req.Set("Content-Type", "application/json")
 	if info.IsStream {
@@ -191,30 +195,37 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		}
 		return openai.OaiResponsesHandler(c, info, resp)
 	default:
-		return nil, types.NewError(errors.New("codex disguise channel: endpoint not supported"), types.ErrorCodeInvalidRequest)
+		return nil, types.NewError(errors.New("codex disguise channel: alpha search response should be handled by AlphaSearchHelper"), types.ErrorCodeInvalidRequest)
 	}
 }
 
 // ---- 指纹 / turn-state 辅助（gin context 暂存共享 IDs）----
 
 func (a *Adaptor) stageCodexFingerprintIDs(c *gin.Context, info *relaycommon.RelayInfo) {
-	if c == nil || info == nil {
+	if c == nil || info == nil || !codexDisguiseEnabled(info) {
+		return
+	}
+	if _, ok := c.Get(codexFingerprintIDsContextKey); ok {
 		return
 	}
 	mode := codexDisguiseFingerprintMode(info)
 	seed := codexDisguiseFingerprintSeed(info)
-	clientSessionID := ""
-	if c.Request != nil {
-		clientSessionID = strings.TrimSpace(c.Request.Header.Get("session-id"))
-		if clientSessionID == "" {
-			clientSessionID = strings.TrimSpace(c.Request.Header.Get("session_id"))
-		}
-	}
+	clientSessionID := extractClientSessionID(c.Request.Header)
 	ids := resolveCodexFingerprintIDs(mode, seed, clientSessionID)
 	c.Set(codexFingerprintIDsContextKey, ids)
 	if ids != nil {
 		c.Set(codexThreadIDContextKey, ids.ThreadID)
 	}
+}
+
+func extractClientSessionID(h http.Header) string {
+	if h == nil {
+		return ""
+	}
+	if v := strings.TrimSpace(h.Get("session-id")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(h.Get("session_id"))
 }
 
 func (a *Adaptor) stagedCodexFingerprintIDs(c *gin.Context) *codexFingerprintIDs {
@@ -229,7 +240,7 @@ func (a *Adaptor) stagedCodexFingerprintIDs(c *gin.Context) *codexFingerprintIDs
 	return ids
 }
 
-func (a *Adaptor) stagedThreadID(c *gin.Context) string {
+func stagedThreadID(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
@@ -246,15 +257,15 @@ func (a *Adaptor) applyFingerprintHeaders(c *gin.Context, info *relaycommon.Rela
 }
 
 func (a *Adaptor) guardTurnState(c *gin.Context, info *relaycommon.RelayInfo, req *http.Header) {
-	if c == nil || req == nil || c.Request == nil {
+	if c == nil || info == nil || req == nil || c.Request == nil {
 		return
 	}
 	blob := strings.TrimSpace(c.Request.Header.Get("x-codex-turn-state"))
 	if blob == "" {
 		return
 	}
-	threadID := a.stagedThreadID(c)
-	guarded := turnStates.guard(threadID, blob)
+	threadID := stagedThreadID(c)
+	guarded := turnStates.guard(info.ChannelId, threadID, blob)
 	if guarded == "" {
 		req.Del("x-codex-turn-state")
 		return
@@ -262,17 +273,26 @@ func (a *Adaptor) guardTurnState(c *gin.Context, info *relaycommon.RelayInfo, re
 	req.Set("x-codex-turn-state", guarded)
 }
 
+// RelayUpstreamTurnState 将上游响应中的 turn-state 透传下游响应头并记录溯源。
+// alpha/search 路径由 AlphaSearchHelper 调用；responses 路径走 captureTurnState。
+func RelayUpstreamTurnState(c *gin.Context, info *relaycommon.RelayInfo, upstream http.Header) {
+	if c == nil || info == nil || upstream == nil || !codexDisguiseEnabled(info) {
+		return
+	}
+	blob := strings.TrimSpace(upstream.Get("x-codex-turn-state"))
+	if blob == "" {
+		return
+	}
+	threadID := stagedThreadID(c)
+	turnStates.note(info.ChannelId, threadID, blob)
+	c.Header("x-codex-turn-state", blob)
+}
+
 func (a *Adaptor) captureTurnState(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) {
 	if c == nil || resp == nil {
 		return
 	}
-	blob := strings.TrimSpace(resp.Header.Get("x-codex-turn-state"))
-	if blob == "" {
-		return
-	}
-	threadID := a.stagedThreadID(c)
-	turnStates.note(threadID, blob)
-	c.Header("x-codex-turn-state", blob)
+	RelayUpstreamTurnState(c, info, resp.Header)
 }
 
 // ---- 渠道配置读取（ChannelOtherSettings，relaykit/dto 新增字段）----
@@ -296,6 +316,11 @@ func codexClientVersionFromSettings(info *relaycommon.RelayInfo) string {
 		if v := NormalizeCodexClientVersion(info.ChannelOtherSettings.CodexClientVersion); v != "" {
 			return v
 		}
+		if v, err := service.GetCodexDisguiseClientVersion(context.Background(), info.ChannelProxyURL); err == nil {
+			if normalized := NormalizeCodexClientVersion(v); normalized != "" {
+				return normalized
+			}
+		}
 	}
 	return codexCLIVersion
 }
@@ -303,6 +328,14 @@ func codexClientVersionFromSettings(info *relaycommon.RelayInfo) string {
 func codexDisguiseEnforceIdentity(info *relaycommon.RelayInfo) bool {
 	if info != nil && info.ChannelOtherSettings.EnforceIdentity != nil {
 		return *info.ChannelOtherSettings.EnforceIdentity
+	}
+	return true
+}
+
+// codexDisguiseEnabled 返回伪装开关：false = 退化为纯转发（不做任何伪装改写）。
+func codexDisguiseEnabled(info *relaycommon.RelayInfo) bool {
+	if info != nil && info.ChannelOtherSettings.DisguiseEnabled != nil {
+		return *info.ChannelOtherSettings.DisguiseEnabled
 	}
 	return true
 }

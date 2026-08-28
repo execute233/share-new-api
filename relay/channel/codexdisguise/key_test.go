@@ -15,17 +15,15 @@ func TestParseDisguiseKeySub2API(t *testing.T) {
 }
 
 func TestParseDisguiseKeyOAuth(t *testing.T) {
-	key, err := ParseDisguiseKey(`{"type":"oauth","access_token":"at","refresh_token":"rt","account_id":"acc_1"}`)
+	key, err := ParseDisguiseKey(`{"type":"oauth","access_token":"at","account_id":"acc_1"}`)
 	require.NoError(t, err)
 	require.Equal(t, DisguiseKeyTypeOAuth, key.Type)
 	assert.Equal(t, "acc_1", key.AccountID)
 }
 
-func TestParseDisguiseKeyOAuthAllowsEmptyAccessToken(t *testing.T) {
-	key, err := ParseDisguiseKey(`{"type":"oauth","refresh_token":"rt","account_id":"acc_1"}`)
-	require.NoError(t, err)
-	require.Equal(t, DisguiseKeyTypeOAuth, key.Type)
-	assert.Empty(t, key.AccessToken)
+func TestParseDisguiseKeyOAuthRequiresAccessToken(t *testing.T) {
+	_, err := ParseDisguiseKey(`{"type":"oauth","refresh_token":"rt","account_id":"acc_1"}`)
+	require.Error(t, err)
 }
 
 func TestParseDisguiseKeyAgent(t *testing.T) {
@@ -49,9 +47,9 @@ func TestParseDisguiseKeyRejectsMissingRequired(t *testing.T) {
 	_, err := ParseDisguiseKey(`{"type":"sub2api"}`)
 	require.Error(t, err)
 	_, err = ParseDisguiseKey(`{"type":"oauth","refresh_token":"rt"}`)
-	require.NoError(t, err, "oauth 允许缺 account_id（刷新后从 JWT 提取）")
+	require.Error(t, err, "oauth 必须 access_token（hot path 不支持 refresh）")
 	_, err = ParseDisguiseKey(`{"type":"oauth"}`)
-	require.Error(t, err, "oauth 必须至少一个 token")
+	require.Error(t, err, "oauth 必须 access_token")
 	_, err = ParseDisguiseKey(`{"type":"agent","agent_private_key":"pk"}`)
 	require.Error(t, err)
 }

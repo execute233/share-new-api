@@ -20,6 +20,7 @@ import { z } from 'zod'
 
 import {
   CLAUDE_FIELD_PASSTHROUGH_TYPES,
+  CHANNEL_TYPE_CODEX_DISGUISE,
   CHANNEL_TYPE_NEW_API,
   CHANNEL_STATUS,
   ERROR_MESSAGES,
@@ -225,6 +226,12 @@ export const channelFormSchema = z
     allow_inference_geo: z.boolean().optional(), // OpenAI/Anthropic: inference geography
     allow_speed: z.boolean().optional(), // Anthropic: speed mode control
     claude_beta_query: z.boolean().optional(), // Anthropic: beta query passthrough
+    // Codex disguise channel settings (stored in settings JSON)
+    disguise_enabled: z.boolean().optional(),
+    fingerprint_mode: z.enum(['off', 'device', 'session', 'full']).optional(),
+    fingerprint_seed: z.string().optional(),
+    codex_client_version: z.string().optional(),
+    enforce_identity: z.boolean().optional(),
     // Upstream model update settings (stored in settings JSON)
     upstream_model_update_check_enabled: z.boolean().optional(),
     upstream_model_update_auto_sync_enabled: z.boolean().optional(),
@@ -366,6 +373,11 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   allow_inference_geo: false,
   allow_speed: false,
   claude_beta_query: false,
+  disguise_enabled: true,
+  fingerprint_mode: 'session',
+  fingerprint_seed: '',
+  codex_client_version: '',
+  enforce_identity: true,
   upstream_model_update_check_enabled: false,
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
@@ -458,6 +470,11 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateCheckEnabled = false
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
+  let disguiseEnabled = true
+  let fingerprintMode: 'off' | 'device' | 'session' | 'full' = 'session'
+  let fingerprintSeed = ''
+  let codexClientVersion = ''
+  let enforceIdentity = true
   let advancedCustom = ''
 
   if (channel.settings) {
@@ -479,6 +496,15 @@ export function transformChannelToFormDefaults(
       )
         ? parsed.upstream_model_update_ignored_models.join(',')
         : ''
+      // nil/缺省在服务端视为开启，表单保持同一语义（仅显式 false 为关闭）。
+      disguiseEnabled = parsed.disguise_enabled !== false
+      const parsedMode = String(parsed.fingerprint_mode || '')
+      if (['off', 'device', 'session', 'full'].includes(parsedMode)) {
+        fingerprintMode = parsedMode as 'off' | 'device' | 'session' | 'full'
+      }
+      fingerprintSeed = String(parsed.fingerprint_seed || '')
+      codexClientVersion = String(parsed.codex_client_version || '')
+      enforceIdentity = parsed.enforce_identity !== false
       if (parsed.advanced_custom) {
         advancedCustom = stringifyAdvancedCustomConfig(parsed.advanced_custom)
       }
@@ -527,6 +553,11 @@ export function transformChannelToFormDefaults(
     upstream_model_update_check_enabled: upstreamModelUpdateCheckEnabled,
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
     upstream_model_update_ignored_models: upstreamModelUpdateIgnoredModels,
+    disguise_enabled: disguiseEnabled,
+    fingerprint_mode: fingerprintMode,
+    fingerprint_seed: fingerprintSeed,
+    codex_client_version: codexClientVersion,
+    enforce_identity: enforceIdentity,
     advanced_custom: advancedCustom,
   }
 }
@@ -660,6 +691,31 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     }
   } else if ('advanced_custom' in settingsObj) {
     delete settingsObj.advanced_custom
+  }
+
+  // Codex disguise channel settings (only for the disguise channel type)
+  if (formData.type === CHANNEL_TYPE_CODEX_DISGUISE) {
+    settingsObj.disguise_enabled = formData.disguise_enabled !== false
+    settingsObj.fingerprint_mode = formData.fingerprint_mode || 'session'
+    settingsObj.fingerprint_seed = formData.fingerprint_seed || ''
+    settingsObj.codex_client_version = formData.codex_client_version || ''
+    settingsObj.enforce_identity = formData.enforce_identity !== false
+  } else {
+    if ('disguise_enabled' in settingsObj) {
+      delete settingsObj.disguise_enabled
+    }
+    if ('fingerprint_mode' in settingsObj) {
+      delete settingsObj.fingerprint_mode
+    }
+    if ('fingerprint_seed' in settingsObj) {
+      delete settingsObj.fingerprint_seed
+    }
+    if ('codex_client_version' in settingsObj) {
+      delete settingsObj.codex_client_version
+    }
+    if ('enforce_identity' in settingsObj) {
+      delete settingsObj.enforce_identity
+    }
   }
 
   return JSON.stringify(settingsObj)

@@ -90,6 +90,11 @@ func TestResponsesCompactChannelSupport(t *testing.T) {
 	}
 }
 
+func TestNormalizeChannelTestEndpointCodexDisguise(t *testing.T) {
+	ch := &model.Channel{Type: constant.ChannelTypeCodexDisguise}
+	assert.Equal(t, string(constant.EndpointTypeOpenAIResponse), normalizeChannelTestEndpoint(ch, ""))
+}
+
 func TestMultiprotocolGatewayEndpointTypes(t *testing.T) {
 	want := []constant.EndpointType{
 		constant.EndpointTypeOpenAI,

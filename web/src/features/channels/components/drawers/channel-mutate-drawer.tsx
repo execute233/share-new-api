@@ -138,6 +138,7 @@ import {
 } from '../../api'
 import {
   ADD_MODE_OPTIONS,
+  CHANNEL_TYPE_CODEX_DISGUISE,
   CLAUDE_FIELD_PASSTHROUGH_TYPES,
   CHANNEL_STATUS_LABELS,
   CHANNEL_TYPE_OPTIONS,
@@ -295,6 +296,11 @@ const SENSITIVE_FORM_FIELDS = [
   'allow_inference_geo',
   'allow_speed',
   'claude_beta_query',
+  'disguise_enabled',
+  'fingerprint_mode',
+  'fingerprint_seed',
+  'codex_client_version',
+  'enforce_identity',
   'upstream_model_update_check_enabled',
   'upstream_model_update_auto_sync_enabled',
   'upstream_model_update_ignored_models',
@@ -343,6 +349,11 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     (values.http2_connection_shards != null &&
       values.http2_connection_shards > 1) ||
     values.claude_beta_query ||
+    values.disguise_enabled === false ||
+    (values.fingerprint_mode && values.fingerprint_mode !== 'session') ||
+    values.fingerprint_seed?.trim() ||
+    values.codex_client_version?.trim() ||
+    values.enforce_identity === false ||
     values.upstream_model_update_check_enabled ||
     values.upstream_model_update_auto_sync_enabled ||
     values.upstream_model_update_ignored_models?.trim()
@@ -3479,6 +3490,180 @@ export function ChannelMutateDrawer({
                                 )}
                               />
                             </div>
+
+                            {currentType === CHANNEL_TYPE_CODEX_DISGUISE && (
+                              <fieldset className='divide-border space-y-0 divide-y border-y'>
+                                <FormField
+                                  control={form.control}
+                                  name='disguise_enabled'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Disguise Enabled')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t(
+                                            'Disable to pass through without disguise'
+                                          )}
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='fingerprint_mode'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Fingerprint Mode')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t('Disguise Settings')}
+                                        </FormDescription>
+                                      </div>
+                                      <Select
+                                        items={[
+                                          { value: 'off', label: t('Off') },
+                                          {
+                                            value: 'device',
+                                            label: t('Device'),
+                                          },
+                                          {
+                                            value: 'session',
+                                            label: t('Session'),
+                                          },
+                                          { value: 'full', label: t('Full') },
+                                        ]}
+                                        value={field.value}
+                                        onValueChange={(value) => {
+                                          field.onChange(value)
+                                        }}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger className='w-40'>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent alignItemWithTrigger={false}>
+                                          <SelectGroup>
+                                            {[
+                                              {
+                                                value: 'off',
+                                                label: t('Off'),
+                                              },
+                                              {
+                                                value: 'device',
+                                                label: t('Device'),
+                                              },
+                                              {
+                                                value: 'session',
+                                                label: t('Session'),
+                                              },
+                                              {
+                                                value: 'full',
+                                                label: t('Full'),
+                                              },
+                                            ].map((item) => (
+                                              <SelectItem
+                                                key={item.value}
+                                                value={item.value}
+                                              >
+                                                {item.label}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
+                                        </SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='fingerprint_seed'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Fingerprint Seed')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t(
+                                            'Empty disables fingerprint convergence'
+                                          )}
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Input
+                                          className='h-8 w-56'
+                                          placeholder='00000000-0000-4000-8000-000000000000'
+                                          value={field.value}
+                                          onChange={(event) =>
+                                            field.onChange(event.target.value)
+                                          }
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='codex_client_version'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Codex Client Version')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t('Disguise Settings')}
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Input
+                                          className='h-8 w-40'
+                                          placeholder='0.146.0'
+                                          value={field.value}
+                                          onChange={(event) =>
+                                            field.onChange(event.target.value)
+                                          }
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='enforce_identity'
+                                  render={({ field }) => (
+                                    <FormItem className='flex items-center justify-between px-4 py-3'>
+                                      <div className='space-y-0.5'>
+                                        <FormLabel>
+                                          {t('Enforce Identity')}
+                                        </FormLabel>
+                                        <FormDescription>
+                                          {t('Disguise Settings')}
+                                        </FormDescription>
+                                      </div>
+                                      <FormControl>
+                                        <Switch
+                                          checked={field.value}
+                                          onCheckedChange={field.onChange}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </fieldset>
+                            )}
 
                             <FormField
                               control={form.control}

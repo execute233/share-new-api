@@ -19,7 +19,6 @@ type DisguiseKey struct {
 	Type            DisguiseKeyType `json:"type"`
 	APIKey          string          `json:"api_key,omitempty"`
 	AccessToken     string          `json:"access_token,omitempty"`
-	RefreshToken    string          `json:"refresh_token,omitempty"`
 	AccountID       string          `json:"account_id,omitempty"`
 	AgentPrivateKey string          `json:"agent_private_key,omitempty"`
 	AgentRuntimeID  string          `json:"agent_runtime_id,omitempty"`
@@ -37,7 +36,6 @@ func ParseDisguiseKey(raw string) (*DisguiseKey, error) {
 	}
 	key.APIKey = strings.TrimSpace(key.APIKey)
 	key.AccessToken = strings.TrimSpace(key.AccessToken)
-	key.RefreshToken = strings.TrimSpace(key.RefreshToken)
 	key.AccountID = strings.TrimSpace(key.AccountID)
 	key.AgentPrivateKey = strings.TrimSpace(key.AgentPrivateKey)
 	key.AgentRuntimeID = strings.TrimSpace(key.AgentRuntimeID)
@@ -58,8 +56,8 @@ func (k *DisguiseKey) Validate() error {
 			return errors.New("codex disguise channel: api_key is required for sub2api type")
 		}
 	case DisguiseKeyTypeOAuth:
-		if k.AccessToken == "" && k.RefreshToken == "" {
-			return errors.New("codex disguise channel: access_token or refresh_token is required for oauth type")
+		if k.AccessToken == "" {
+			return errors.New("codex disguise channel: access_token is required for oauth type (refresh not supported on hot path)")
 		}
 	case DisguiseKeyTypeAgent:
 		if k.AgentPrivateKey == "" || k.AgentRuntimeID == "" || k.AgentTaskID == "" {

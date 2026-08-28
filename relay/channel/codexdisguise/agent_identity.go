@@ -3,7 +3,6 @@ package codexdisguise
 import (
 	"crypto"
 	"crypto/ed25519"
-	"crypto/sha512"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -11,8 +10,6 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/nacl/box"
 )
 
 type agentIdentityKey struct {
@@ -82,47 +79,4 @@ func buildAgentAssertion(key agentIdentityKey, now time.Time) (string, error) {
 		return "", errors.New("failed to serialize agent assertion")
 	}
 	return "AgentAssertion " + base64.RawURLEncoding.EncodeToString(encoded), nil
-}
-
-// signAgentTaskRegistration 构造 task 注册签名：ed25519 签名 runtimeID:timestamp。
-func signAgentTaskRegistration(key agentIdentityKey, timestamp time.Time) (string, string, error) {
-	if key.runtimeID == "" {
-		return "", "", errors.New("agent identity runtime id is missing")
-	}
-	formatted := timestamp.UTC().Format(time.RFC3339)
-	signature, err := key.privateKey.Sign(nil, []byte(key.runtimeID+":"+formatted), crypto.Hash(0))
-	if err != nil {
-		return "", "", errors.New("failed to sign agent task registration")
-	}
-	return formatted, base64.StdEncoding.EncodeToString(signature), nil
-}
-
-// decryptAgentTaskID 用派生 X25519 私钥解密 encrypted_task_id。
-func decryptAgentTaskID(key agentIdentityKey, encoded string) (string, error) {
-	ciphertext, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
-	if err != nil {
-		return "", errors.New("encrypted agent task id is not valid base64")
-	}
-	seed := key.privateKey.Seed()
-	digest := sha512.Sum512(seed)
-	var curvePrivate [32]byte
-	copy(curvePrivate[:], digest[:32])
-	curvePrivate[0] &= 248
-	curvePrivate[31] &= 127
-	curvePrivate[31] |= 64
-	curvePublicBytes, err := curve25519.X25519(curvePrivate[:], curve25519.Basepoint)
-	if err != nil {
-		return "", errors.New("failed to derive agent identity decryption key")
-	}
-	var curvePublic [32]byte
-	copy(curvePublic[:], curvePublicBytes)
-	plaintext, ok := box.OpenAnonymous(nil, ciphertext, &curvePublic, &curvePrivate)
-	if !ok {
-		return "", errors.New("failed to decrypt encrypted agent task id")
-	}
-	taskID := strings.TrimSpace(string(plaintext))
-	if taskID == "" {
-		return "", errors.New("decrypted agent task id is empty")
-	}
-	return taskID, nil
 }

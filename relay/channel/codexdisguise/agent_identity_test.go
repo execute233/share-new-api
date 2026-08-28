@@ -3,7 +3,6 @@ package codexdisguise
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"testing"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/nacl/box"
 )
 
 func newTestAgentKey(t *testing.T) agentIdentityKey {
@@ -50,42 +47,6 @@ func TestBuildAgentAssertionRequiresTask(t *testing.T) {
 	key.taskID = ""
 	_, err := buildAgentAssertion(key, time.Now())
 	require.Error(t, err)
-}
-
-func TestSignAgentTaskRegistration(t *testing.T) {
-	key := newTestAgentKey(t)
-	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
-	formatted, signature, err := signAgentTaskRegistration(key, now)
-	require.NoError(t, err)
-	assert.Equal(t, "2026-08-28T12:00:00Z", formatted)
-	sig, err := base64.StdEncoding.DecodeString(signature)
-	require.NoError(t, err)
-	payload := []byte("runtime-1:2026-08-28T12:00:00Z")
-	assert.True(t, ed25519.Verify(key.privateKey.Public().(ed25519.PublicKey), payload, sig))
-}
-
-func TestDecryptAgentTaskIDRoundTrip(t *testing.T) {
-	key := newTestAgentKey(t)
-	// 用与实现相同的派生路径构造加密方公钥
-	seed := key.privateKey.Seed()
-	digest := sha512.Sum512(seed)
-	var curvePrivate [32]byte
-	copy(curvePrivate[:], digest[:32])
-	curvePrivate[0] &= 248
-	curvePrivate[31] &= 127
-	curvePrivate[31] |= 64
-	pubBytes, err := curve25519.X25519(curvePrivate[:], curve25519.Basepoint)
-	require.NoError(t, err)
-	var pub [32]byte
-	copy(pub[:], pubBytes)
-	plaintext := []byte("task-42")
-	sealed, err := box.SealAnonymous(nil, plaintext, &pub, rand.Reader)
-	require.NoError(t, err)
-	encoded := base64.StdEncoding.EncodeToString(sealed)
-
-	decrypted, err := decryptAgentTaskID(key, encoded)
-	require.NoError(t, err)
-	assert.Equal(t, "task-42", decrypted)
 }
 
 func hasPrefixFold(s, prefix string) bool {
