@@ -129,8 +129,8 @@ function buildTimeRangeParams(
 }
 
 /**
- * Build base parameters with time range (for drawing logs)
- * @param useMilliseconds - Whether to use millisecond timestamps (true for drawing logs)
+ * Build base parameters with time range
+ * @param useMilliseconds - Whether to use millisecond timestamps
  */
 export function buildBaseParams(config: {
   page: number

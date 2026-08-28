@@ -50,7 +50,6 @@ export const STATIC_I18N_KEYS = [
   'stale',
   'Master instances run scheduled background tasks.',
   'Worker instances do not run master-only background tasks.',
-  'Drawing task polling',
 
   // Pricing constants
   'Name',
@@ -477,8 +476,6 @@ export const STATIC_I18N_KEYS = [
   'API token management',
   'Usage Logs',
   'API usage records',
-  'Drawing Logs',
-  'Drawing task records',
   'Personal Center Area',
   'User personal functions',
   'Wallet Management',
