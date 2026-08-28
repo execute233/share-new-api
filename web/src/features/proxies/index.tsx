@@ -61,6 +61,10 @@ function QuickAddDialog(props: {
       }
       setResult(JSON.stringify(response.data?.items || [], null, 2))
       props.onSaved()
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t('Failed to add proxies')
+      )
     } finally {
       setSaving(false)
     }

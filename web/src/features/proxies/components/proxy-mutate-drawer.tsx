@@ -16,8 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
+import { type SubmitHandler, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import {
   sideDrawerContentClassName,
@@ -27,7 +30,14 @@ import {
 } from '@/components/drawer-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import {
   Select,
   SelectContent,
@@ -44,27 +54,12 @@ import {
 } from '@/components/ui/sheet'
 
 import { createProxy, updateProxy, type ProxySummary } from '../api'
-
-const protocols = ['http', 'https', 'socks5', 'socks5h', 'ss']
-
-type FormState = {
-  name: string
-  protocol: string
-  host: string
-  port: string
-  username: string
-  password: string
-  status: string
-}
-const emptyForm: FormState = {
-  name: '',
-  protocol: 'http',
-  host: '',
-  port: '8080',
-  username: '',
-  password: '',
-  status: 'active',
-}
+import {
+  PROXY_FORM_DEFAULT_VALUES,
+  proxyFormSchema,
+  transformProxyToFormValues,
+  type ProxyFormValues,
+} from '../lib/proxy-form'
 
 export function ProxyMutateDrawer(props: {
   proxy: ProxySummary | null
@@ -73,40 +68,43 @@ export function ProxyMutateDrawer(props: {
   onSaved: () => void
 }) {
   const { t } = useTranslation()
-  const [form, setForm] = useState<FormState>(() =>
-    props.proxy
-      ? {
-          name: props.proxy.name,
-          protocol: props.proxy.protocol,
-          host: props.proxy.host,
-          port: String(props.proxy.port),
-          username: '',
-          password: '',
-          status: props.proxy.status,
-        }
-      : emptyForm
-  )
   const [saving, setSaving] = useState(false)
-  const isShadowsocks = form.protocol === 'ss'
+
+  const form = useForm<ProxyFormValues>({
+    resolver: zodResolver(proxyFormSchema),
+    defaultValues: props.proxy
+      ? transformProxyToFormValues(props.proxy)
+      : PROXY_FORM_DEFAULT_VALUES,
+  })
+
+  useEffect(() => {
+    if (!props.open) return
+    form.reset(
+      props.proxy
+        ? transformProxyToFormValues(props.proxy)
+        : PROXY_FORM_DEFAULT_VALUES
+    )
+  }, [props.open, props.proxy, form])
+
+  const isShadowsocks = form.watch('protocol') === 'ss'
   let usernamePlaceholder = ''
   if (isShadowsocks) {
     usernamePlaceholder = 'chacha20-ietf-poly1305'
   } else if (props.proxy?.credential_configured) {
     usernamePlaceholder = t('Leave empty to keep current')
   }
-  const update = (key: keyof FormState, value: string) =>
-    setForm((current) => ({ ...current, [key]: value }))
-  const submit = async () => {
+
+  const onSubmit: SubmitHandler<ProxyFormValues> = async (values) => {
     setSaving(true)
     try {
       const payload = {
-        name: form.name.trim(),
-        protocol: form.protocol,
-        host: form.host.trim(),
-        port: Number(form.port),
-        username: form.username || undefined,
-        password: form.password || undefined,
-        status: form.status,
+        name: values.name.trim(),
+        protocol: values.protocol,
+        host: values.host.trim(),
+        port: values.port,
+        username: values.username || undefined,
+        password: values.password || undefined,
+        status: values.status,
       }
       const result = props.proxy
         ? await updateProxy(props.proxy.id, payload)
@@ -116,10 +114,15 @@ export function ProxyMutateDrawer(props: {
       }
       props.onSaved()
       props.onOpenChange(false)
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t('Failed to save proxy')
+      )
     } finally {
       setSaving(false)
     }
   }
+
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent className={sideDrawerContentClassName('sm:max-w-lg')}>
@@ -128,103 +131,160 @@ export function ProxyMutateDrawer(props: {
             {props.proxy ? t('Edit proxy') : t('Add proxy')}
           </SheetTitle>
         </SheetHeader>
-        <div className={sideDrawerFormClassName()}>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-name'>{t('Name')}</Label>
-            <Input
-              id='proxy-name'
-              value={form.name}
-              onChange={(e) => update('name', e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-protocol'>{t('Protocol')}</Label>
-            <Select
-              value={form.protocol}
-              onValueChange={(value) => value && update('protocol', value)}
-            >
-              <SelectTrigger id='proxy-protocol' className='w-full min-w-0'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {protocols.map((protocol) => (
-                  <SelectItem key={protocol} value={protocol}>
-                    {protocol}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-host'>{t('Host')}</Label>
-            <Input
-              id='proxy-host'
-              value={form.host}
-              onChange={(e) => update('host', e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-port'>{t('Port')}</Label>
-            <Input
-              id='proxy-port'
-              type='number'
-              value={form.port}
-              onChange={(e) => update('port', e.target.value)}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-username'>
-              {isShadowsocks ? t('Encryption method') : t('Username')}
-            </Label>
-            <Input
-              id='proxy-username'
-              value={form.username}
-              onChange={(e) => update('username', e.target.value)}
-              placeholder={usernamePlaceholder}
-            />
-          </div>
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-password'>{t('Password')}</Label>
-            <Input
-              id='proxy-password'
-              type='password'
-              value={form.password}
-              onChange={(e) => update('password', e.target.value)}
-              placeholder={
-                props.proxy?.credential_configured
-                  ? t('Leave empty to keep current')
-                  : ''
-              }
-            />
-          </div>
-          {isShadowsocks && (
-            <p className='text-sm text-muted-foreground'>
-              {t(
-                'For Shadowsocks, the encryption method goes in the first field (e.g. aes-256-gcm, chacha20-ietf-poly1305) and the password in the second. You can also paste a full ss:// URL in quick add.'
+        <Form {...form}>
+          <form
+            id='proxy-form'
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={sideDrawerFormClassName()}
+          >
+            <FormField
+              control={form.control}
+              name='name'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Name')}</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </p>
-          )}
-          <div className='space-y-2'>
-            <Label htmlFor='proxy-status'>{t('Status')}</Label>
-            <Select
-              value={form.status}
-              onValueChange={(value) => value && update('status', value)}
-            >
-              <SelectTrigger id='proxy-status' className='w-full min-w-0'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='active'>{t('Active')}</SelectItem>
-                <SelectItem value='inactive'>{t('Inactive')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+            />
+            <FormField
+              control={form.control}
+              name='protocol'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Protocol')}</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => value && field.onChange(value)}
+                    >
+                      <SelectTrigger className='w-full min-w-0'>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {proxyFormSchema.shape.protocol.options.map(
+                          (protocol) => (
+                            <SelectItem key={protocol} value={protocol}>
+                              {protocol}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='host'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Host')}</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='port'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Port')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      value={field.value}
+                      onChange={(e) =>
+                        field.onChange(Number(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='username'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {isShadowsocks ? t('Encryption method') : t('Username')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder={usernamePlaceholder} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='password'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Password')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='password'
+                      {...field}
+                      placeholder={
+                        props.proxy?.credential_configured
+                          ? t('Leave empty to keep current')
+                          : ''
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {isShadowsocks && (
+              <p className='text-sm text-muted-foreground'>
+                {t(
+                  'For Shadowsocks, the encryption method goes in the first field (e.g. aes-256-gcm, chacha20-ietf-poly1305) and the password in the second. You can also paste a full ss:// URL in quick add.'
+                )}
+              </p>
+            )}
+            <FormField
+              control={form.control}
+              name='status'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Status')}</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => value && field.onChange(value)}
+                    >
+                      <SelectTrigger className='w-full min-w-0'>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='active'>{t('Active')}</SelectItem>
+                        <SelectItem value='inactive'>{t('Inactive')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
         <SheetFooter className={sideDrawerFooterClassName()}>
           <Button variant='outline' onClick={() => props.onOpenChange(false)}>
             {t('Cancel')}
           </Button>
-          <Button disabled={saving} onClick={() => void submit()}>
+          <Button type='submit' form='proxy-form' disabled={saving}>
             {t('Save')}
           </Button>
         </SheetFooter>
