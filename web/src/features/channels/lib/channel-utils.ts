@@ -58,10 +58,6 @@ export function getChannelTypeIcon(type: number): string {
 
     // Google family
     24: 'Gemini', // Gemini
-
-    // Image generation
-    2: 'Midjourney', // MjProxy
-    5: 'Midjourney', // MjProxyPlus
   }
 
   return TYPE_TO_ICON[type] || 'OpenAI'

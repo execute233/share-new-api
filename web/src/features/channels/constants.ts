@@ -26,8 +26,6 @@ export const CHANNEL_TYPE_NEW_API = 60
 export const CHANNEL_TYPES = {
   0: 'Unknown',
   1: 'OpenAI',
-  2: 'MjProxy',
-  5: 'MjProxyPlus',
   8: 'Custom',
   14: 'Anthropic',
   24: 'Gemini',
@@ -38,7 +36,7 @@ export const CHANNEL_TYPES = {
 } as const
 
 const CHANNEL_TYPE_DISPLAY_ORDER: number[] = [
-  1, 14, 24, 60, 58, 8, 57, 59, 2, 5,
+  1, 14, 24, 60, 58, 8, 57, 59,
 ]
 
 export const CHANNEL_TYPE_OPTIONS: { value: number; label: string }[] = (() => {
