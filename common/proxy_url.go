@@ -20,7 +20,10 @@ var supportedShadowsocksMethods = map[string]string{
 	"AEAD_CHACHA20_POLY1305": "chacha20-ietf-poly1305",
 }
 
-func normalizeShadowsocksMethod(method string) (string, error) {
+// NormalizeShadowsocksMethod validates method against the supported cipher
+// list (case-insensitive, SIP002 aliases allowed) and returns its canonical
+// lowercase name.
+func NormalizeShadowsocksMethod(method string) (string, error) {
 	canonical, ok := supportedShadowsocksMethods[strings.ToUpper(strings.TrimSpace(method))]
 	if !ok {
 		return "", fmt.Errorf("unsupported shadowsocks encryption method: %s", method)
@@ -48,7 +51,7 @@ func normalizeShadowsocksUserInfo(parsedURL *url.URL) error {
 		}
 		method, password = parts[0], parts[1]
 	}
-	canonical, err := normalizeShadowsocksMethod(method)
+	canonical, err := NormalizeShadowsocksMethod(method)
 	if err != nil {
 		return err
 	}

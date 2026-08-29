@@ -89,6 +89,11 @@ func validateAndEncryptProxy(req proxyWriteRequest, existing *model.Proxy) (*mod
 		return nil, err
 	}
 	proxy.IdentityHash = identityHash
+	if proxy.Protocol == model.ProxyProtocolSS && identityUsername != "" {
+		if _, err := common.NormalizeShadowsocksMethod(identityUsername); err != nil {
+			return nil, err
+		}
+	}
 	if err := proxy.Validate(); err != nil {
 		return nil, err
 	}
