@@ -128,6 +128,23 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
+    tool_call_audit?: {
+      request_id?: string
+      user_id?: number
+      channel_id?: number
+      model?: string
+      protocol?: string
+      call_id?: string
+      tool_name?: string
+      arguments?: string
+      arguments_sha256?: string
+      arguments_size?: number
+      rule_ids?: string[]
+      categories?: string[]
+      severities?: string[]
+      reasons?: string[]
+      policy_version?: number
+    }
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.

@@ -82,14 +82,15 @@ type Log struct {
 
 // don't use iota, avoid change log type value
 const (
-	LogTypeUnknown = 0
-	LogTypeTopup   = 1
-	LogTypeConsume = 2
-	LogTypeManage  = 3
-	LogTypeSystem  = 4
-	LogTypeError   = 5
-	LogTypeRefund  = 6
-	LogTypeLogin   = 7
+	LogTypeUnknown       = 0
+	LogTypeTopup         = 1
+	LogTypeConsume       = 2
+	LogTypeManage        = 3
+	LogTypeSystem        = 4
+	LogTypeError         = 5
+	LogTypeRefund        = 6
+	LogTypeLogin         = 7
+	LogTypeToolCallAudit = 8
 )
 
 func ensureLogRequestId(log *Log) {
@@ -248,6 +249,80 @@ func RecordOperationAuditLog(logUserId int, content string, ip string, action st
 	}
 	if err := createLog(log); err != nil {
 		common.SysLog("failed to record operation audit log: " + err.Error())
+	}
+}
+
+func DeleteExpiredToolCallAuditLogs(cutoff int64) error {
+	if LOG_DB == nil || cutoff <= 0 {
+		return nil
+	}
+	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		return LOG_DB.Exec(
+			"ALTER TABLE logs DELETE WHERE type = ? AND created_at < ? SETTINGS mutations_sync = 0",
+			LogTypeToolCallAudit,
+			cutoff,
+		).Error
+	}
+	return LOG_DB.Where("type = ? AND created_at < ?", LogTypeToolCallAudit, cutoff).Delete(&Log{}).Error
+}
+
+type ToolCallAuditLogParams struct {
+	RequestID     string
+	UserID        int
+	ChannelID     int
+	ModelName     string
+	Protocol      string
+	CallID        string
+	ToolName      string
+	Arguments     string
+	ArgumentsHash string
+	ArgumentsSize int
+	RuleIDs       []string
+	Categories    []string
+	Severities    []string
+	Reasons       []string
+	PolicyVersion int
+}
+
+// RecordToolCallAuditLog stores blocked upstream tool calls in admin_info only.
+// UserID is intentionally not used as the log owner so ordinary user log queries
+// cannot expose the full untrusted payload.
+func RecordToolCallAuditLog(params ToolCallAuditLogParams) {
+	if LOG_DB == nil {
+		common.SysLog("skipping tool call audit log because log database is not initialized")
+		return
+	}
+	adminInfo := map[string]interface{}{
+		"tool_call_audit": map[string]interface{}{
+			"request_id":       params.RequestID,
+			"user_id":          params.UserID,
+			"channel_id":       params.ChannelID,
+			"model":            params.ModelName,
+			"protocol":         params.Protocol,
+			"call_id":          params.CallID,
+			"tool_name":        params.ToolName,
+			"arguments":        params.Arguments,
+			"arguments_sha256": params.ArgumentsHash,
+			"arguments_size":   params.ArgumentsSize,
+			"rule_ids":         params.RuleIDs,
+			"categories":       params.Categories,
+			"severities":       params.Severities,
+			"reasons":          params.Reasons,
+			"policy_version":   params.PolicyVersion,
+		},
+	}
+	log := &Log{
+		UserId:    0,
+		CreatedAt: common.GetTimestamp(),
+		Type:      LogTypeToolCallAudit,
+		Content:   "Blocked upstream tool call by security policy",
+		ModelName: params.ModelName,
+		ChannelId: params.ChannelID,
+		RequestId: params.RequestID,
+		Other:     common.MapToJsonStr(adminInfo),
+	}
+	if err := createLog(log); err != nil {
+		common.SysLog("failed to record tool call audit log: " + err.Error())
 	}
 }
 

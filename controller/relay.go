@@ -69,6 +69,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	defer func() {
 		if newAPIError != nil {
+			if newAPIError.GetErrorCode() == types.ErrorCodeToolCallBlocked && !c.Writer.Written() {
+				c.Header("Content-Type", "application/json; charset=utf-8")
+				c.Header("Transfer-Encoding", "")
+				c.Header("X-Accel-Buffering", "")
+			}
 			logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
 			switch relayFormat {

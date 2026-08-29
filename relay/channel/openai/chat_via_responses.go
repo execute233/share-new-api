@@ -40,6 +40,9 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	if oaiError := responsesResp.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
+	if auditErr := service.AuditResponsesResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &responsesResp); auditErr != nil {
+		return nil, auditErr
+	}
 
 	chatResult, err := relayconvert.ConvertResponse(c, info, types.RelayFormatOpenAI, &responsesResp)
 	if err != nil {
@@ -80,6 +83,9 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 func OaiResponsesToChatBufferedStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	if resp == nil || resp.Body == nil {
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+	}
+	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
+		return nil, auditErr
 	}
 	defer service.CloseResponseBodyGracefully(resp)
 
@@ -149,6 +155,9 @@ func OaiResponsesToChatBufferedStreamHandler(c *gin.Context, info *relaycommon.R
 		}
 	}
 	accumulator.SupplementResponseOutput(finalResponse)
+	if auditErr := service.AuditResponsesResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), finalResponse); auditErr != nil {
+		return nil, auditErr
+	}
 
 	chatResult, err := relayconvert.ConvertResponse(c, info, types.RelayFormatOpenAI, finalResponse)
 	if err != nil {
@@ -188,6 +197,9 @@ func OaiResponsesToChatBufferedStreamHandler(c *gin.Context, info *relaycommon.R
 func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	if resp == nil || resp.Body == nil {
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+	}
+	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
+		return nil, auditErr
 	}
 
 	defer service.CloseResponseBodyGracefully(resp)

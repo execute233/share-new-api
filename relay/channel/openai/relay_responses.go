@@ -33,6 +33,9 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	if oaiError := responsesResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
+	if auditErr := service.AuditResponsesResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &responsesResponse); auditErr != nil {
+		return nil, auditErr
+	}
 
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
@@ -76,6 +79,9 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	if resp == nil || resp.Body == nil {
 		logger.LogError(c, "invalid response or response body")
 		return nil, types.NewError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse)
+	}
+	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
+		return nil, auditErr
 	}
 
 	defer service.CloseResponseBodyGracefully(resp)

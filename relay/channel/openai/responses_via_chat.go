@@ -34,6 +34,9 @@ func OaiChatToResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	if oaiError := chatResp.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
+	if auditErr := service.AuditOpenAITextResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &chatResp); auditErr != nil {
+		return nil, auditErr
+	}
 
 	if responseID := helper.GetResponseID(c); responseID != "" {
 		chatResp.Id = responseID
@@ -65,6 +68,9 @@ func OaiChatToResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	if resp == nil || resp.Body == nil {
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+	}
+	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
+		return nil, auditErr
 	}
 	defer service.CloseResponseBodyGracefully(resp)
 

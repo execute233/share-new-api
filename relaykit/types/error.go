@@ -26,11 +26,11 @@ type ClaudeError struct {
 type ErrorType string
 
 const (
-	ErrorTypeNewAPIError     ErrorType = "new_api_error"
-	ErrorTypeOpenAIError     ErrorType = "openai_error"
-	ErrorTypeClaudeError     ErrorType = "claude_error"
-	ErrorTypeGeminiError     ErrorType = "gemini_error"
-	ErrorTypeUpstreamError   ErrorType = "upstream_error"
+	ErrorTypeNewAPIError   ErrorType = "new_api_error"
+	ErrorTypeOpenAIError   ErrorType = "openai_error"
+	ErrorTypeClaudeError   ErrorType = "claude_error"
+	ErrorTypeGeminiError   ErrorType = "gemini_error"
+	ErrorTypeUpstreamError ErrorType = "upstream_error"
 )
 
 type ErrorCode string
@@ -38,6 +38,7 @@ type ErrorCode string
 const (
 	ErrorCodeInvalidRequest         ErrorCode = "invalid_request"
 	ErrorCodeSensitiveWordsDetected ErrorCode = "sensitive_words_detected"
+	ErrorCodeToolCallBlocked        ErrorCode = "tool_call_blocked"
 	ErrorCodeViolationFeeGrokCSAM   ErrorCode = "violation_fee.grok.csam"
 
 	// new api error

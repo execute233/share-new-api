@@ -105,6 +105,9 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		logger.LogError(c, "invalid response or response body")
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
+	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
+		return nil, auditErr
+	}
 
 	defer service.CloseResponseBodyGracefully(resp)
 
@@ -226,7 +229,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
-	logger.LogDebug(c, "upstream response body: %s", responseBody)
+	logger.LogDebug(c, "upstream response body received: bytes=%d", len(responseBody))
 	// Unmarshal to simpleResponse
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
@@ -235,6 +238,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	if oaiError := simpleResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
+	}
+	if auditErr := service.AuditOpenAITextResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &simpleResponse); auditErr != nil {
+		return nil, auditErr
 	}
 
 	for _, choice := range simpleResponse.Choices {
