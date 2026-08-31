@@ -59,3 +59,12 @@ func TestUpdateToolCallAuditSettingsKeepsPreviousConfigOnValidationError(t *test
 	require.Error(t, err)
 	assert.Equal(t, previous, GetToolCallAuditSettings())
 }
+
+func TestValidateToolCallAuditSettingsRejectsArrayIndexPaths(t *testing.T) {
+	config := validToolCallAuditSettings()
+	config.Rules[0].ArgumentPaths = []string{"items[0].cmd"}
+	require.Error(t, ValidateToolCallAuditSettings(config))
+
+	config.Rules[0].ArgumentPaths = []string{"items.cmd"}
+	assert.NoError(t, ValidateToolCallAuditSettings(config))
+}

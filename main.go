@@ -350,6 +350,7 @@ func InitResources() error {
 	}
 
 	service.StartAuthArtifactCleanup()
+	service.StartToolCallAuditLogCleanup()
 
 	return nil
 }

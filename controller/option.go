@@ -344,6 +344,10 @@ type ToolCallAuditTestRequest struct {
 	Arguments string                        `json:"arguments"`
 }
 
+func GetToolCallAuditDefaults(c *gin.Context) {
+	common.ApiSuccess(c, gin.H{"rules": setting.DefaultToolCallAuditRules()})
+}
+
 func TestToolCallAudit(c *gin.Context) {
 	var request ToolCallAuditTestRequest
 	if err := common.DecodeJson(c.Request.Body, &request); err != nil {

@@ -48,6 +48,8 @@ var toolCallAuditState = struct {
 	config ToolCallAuditSettings
 }{config: defaultToolCallAuditSettings()}
 
+var toolCallAuditArgumentPathPattern = regexp.MustCompile(`^[A-Za-z0-9_*-]+(?:\.[A-Za-z0-9_*-]+)*$`)
+
 func defaultToolCallAuditSettings() ToolCallAuditSettings {
 	return ToolCallAuditSettings{
 		Version:               1,
@@ -69,6 +71,10 @@ func defaultToolCallAuditRules() []ToolCallAuditRule {
 		{ID: "dangerous-shell-exfiltration", Name: "Block shell network exfiltration", Enabled: true, Severity: "critical", Category: "network_exfiltration", ToolNames: []string{"shell", "exec", "run_*"}, ArgumentPaths: []string{"cmd", "command"}, MatchType: "contains", Patterns: []string{"curl", "wget", "--data", "$("}},
 		{ID: "encoded-command", Name: "Block encoded shell commands", Enabled: true, Severity: "high", Category: "encoded_command", ToolNames: []string{"shell", "exec", "run_*"}, ArgumentPaths: []string{"cmd", "command"}, MatchType: "contains", Patterns: []string{"powershell", "encodedcommand", "base64"}},
 	}
+}
+
+func DefaultToolCallAuditRules() []ToolCallAuditRule {
+	return cloneToolCallAuditSettings(defaultToolCallAuditSettings()).Rules
 }
 
 func GetToolCallAuditSettings() ToolCallAuditSettings {
@@ -179,7 +185,7 @@ func ValidateToolCallAuditSettings(config ToolCallAuditSettings) error {
 			}
 		}
 		for _, argumentPath := range rule.ArgumentPaths {
-			if !regexp.MustCompile(`^[A-Za-z0-9_.\[\]*-]+$`).MatchString(argumentPath) || len(argumentPath) > 512 {
+			if !toolCallAuditArgumentPathPattern.MatchString(argumentPath) || len(argumentPath) > 512 {
 				return fmt.Errorf("rule %s has an invalid argument path", rule.ID)
 			}
 		}

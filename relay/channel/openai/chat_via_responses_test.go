@@ -6,15 +6,70 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type notifyingResponseWriter struct {
+	gin.ResponseWriter
+	wrote chan struct{}
+}
+
+func (w *notifyingResponseWriter) Write(data []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(data)
+	select {
+	case w.wrote <- struct{}{}:
+	default:
+	}
+	return n, err
+}
+
+func (w *notifyingResponseWriter) WriteString(data string) (int, error) {
+	n, err := w.ResponseWriter.WriteString(data)
+	select {
+	case w.wrote <- struct{}{}:
+	default:
+	}
+	return n, err
+}
+
+func setOpenAIStreamAuditSettings(t *testing.T, mode setting.ToolCallAuditMode) {
+	t.Helper()
+	previous := setting.GetToolCallAuditSettings()
+	config := setting.ToolCallAuditSettings{
+		Version:               1,
+		Mode:                  mode,
+		MaxArgumentBytes:      4096,
+		MaxTotalArgumentBytes: 8192,
+		MaxJSONDepth:          8,
+		LogRetentionDays:      7,
+		Rules: []setting.ToolCallAuditRule{{
+			ID:            "private-key",
+			Enabled:       true,
+			ToolNames:     []string{"shell"},
+			ArgumentPaths: []string{"path"},
+			MatchType:     "contains",
+			Patterns:      []string{"id_rsa"},
+		}},
+	}
+	data, err := common.Marshal(config)
+	require.NoError(t, err)
+	require.NoError(t, setting.UpdateToolCallAuditSettings(string(data)))
+	t.Cleanup(func() {
+		previousData, marshalErr := common.Marshal(previous)
+		require.NoError(t, marshalErr)
+		require.NoError(t, setting.UpdateToolCallAuditSettings(string(previousData)))
+	})
+}
 
 func newResponsesChatTestContext(t *testing.T, body string, isStream bool) (*gin.Context, *httptest.ResponseRecorder, *http.Response, *relaycommon.RelayInfo) {
 	t.Helper()
@@ -85,6 +140,109 @@ func TestOaiResponsesToChatStreamHandlerConvertsSSEOrderAndUsage(t *testing.T) {
 		`"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5`,
 		`data: [DONE]`,
 	)
+}
+
+func TestOaiResponsesToChatStreamHandlerBlocksToolWithoutLeakingArguments(t *testing.T) {
+	setOpenAIStreamAuditSettings(t, setting.ToolCallAuditModeBlock)
+	previousTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = previousTimeout })
+	body := strings.Join([]string{
+		`data: {"type":"response.output_text.delta","delta":"safe text"}`,
+		`data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"shell"}}`,
+		`data: {"type":"response.function_call_arguments.delta","output_index":0,"delta":"{\"path\":\"~/.ssh/id_rsa\"}"}`,
+		`data: {"type":"response.completed","response":{"status":"completed"}}`,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	c, recorder, resp, info := newResponsesChatTestContext(t, body, true)
+	_, auditErr := OaiResponsesToChatStreamHandler(c, info, resp)
+
+	require.NotNil(t, auditErr)
+	assert.Equal(t, types.ErrorCodeToolCallBlocked, auditErr.GetErrorCode())
+	output := recorder.Body.String()
+	assert.Contains(t, output, "safe text")
+	assert.Contains(t, output, string(types.ErrorCodeToolCallBlocked))
+	assert.NotContains(t, output, "id_rsa")
+	assert.NotContains(t, output, `"name":"shell"`)
+}
+
+func TestOaiStreamHandlerFlushesSafeTextBeforeBlockingTool(t *testing.T) {
+	setOpenAIStreamAuditSettings(t, setting.ToolCallAuditModeBlock)
+	previousTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = previousTimeout })
+	body := strings.Join([]string{
+		`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"content":"safe text"}}]}`,
+		`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"shell","arguments":"{\"path\":\"~/.ssh/id_rsa\"}"}}]}}]}`,
+		`data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+
+	c, recorder, resp, info := newResponsesChatTestContext(t, body, true)
+	info.RelayMode = relayconstant.RelayModeChatCompletions
+	_, auditErr := OaiStreamHandler(c, info, resp)
+
+	require.NotNil(t, auditErr)
+	assert.Equal(t, types.ErrorCodeToolCallBlocked, auditErr.GetErrorCode())
+	output := recorder.Body.String()
+	assert.Contains(t, output, "safe text")
+	assert.Contains(t, output, string(types.ErrorCodeToolCallBlocked))
+	assert.NotContains(t, output, "id_rsa")
+	assert.NotContains(t, output, `"name":"shell"`)
+}
+
+func TestOaiStreamHandlerFlushesTextBeforeAuditedUpstreamFinishes(t *testing.T) {
+	setOpenAIStreamAuditSettings(t, setting.ToolCallAuditModeBlock)
+	previousTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = previousTimeout })
+
+	reader, writer := io.Pipe()
+	t.Cleanup(func() { _ = reader.Close(); _ = writer.Close() })
+	c, recorder, resp, info := newResponsesChatTestContext(t, "", true)
+	resp.Body = reader
+	info.RelayMode = relayconstant.RelayModeChatCompletions
+	writes := make(chan struct{}, 8)
+	c.Writer = &notifyingResponseWriter{ResponseWriter: c.Writer, wrote: writes}
+	result := make(chan *types.NewAPIError, 1)
+	go func() {
+		_, auditErr := OaiStreamHandler(c, info, resp)
+		result <- auditErr
+	}()
+
+	_, err := io.WriteString(writer, "data: {\"id\":\"chatcmpl_1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"first\"}}]}\n")
+	require.NoError(t, err)
+	_, err = io.WriteString(writer, "data: {\"id\":\"chatcmpl_1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"second\"}}]}\n")
+	require.NoError(t, err)
+
+	select {
+	case <-writes:
+	case <-time.After(3 * time.Second):
+		t.Fatal("safe text was not flushed while the upstream stream remained open")
+	}
+
+	_, err = io.WriteString(writer, "data: {\"id\":\"chatcmpl_1\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"function\":{\"name\":\"shell\",\"arguments\":\"{\\\"path\\\":\\\"~/.ssh/id_rsa\\\"}\"}}]}}]}\n")
+	require.NoError(t, err)
+	_, err = io.WriteString(writer, "data: {\"id\":\"chatcmpl_1\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n")
+	require.NoError(t, err)
+	_, err = io.WriteString(writer, "data: [DONE]\n")
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	select {
+	case auditErr := <-result:
+		require.NotNil(t, auditErr)
+		assert.Equal(t, types.ErrorCodeToolCallBlocked, auditErr.GetErrorCode())
+	case <-time.After(3 * time.Second):
+		t.Fatal("stream handler did not finish after the upstream closed")
+	}
+	output := recorder.Body.String()
+	assert.Contains(t, output, "first")
+	assert.Contains(t, output, string(types.ErrorCodeToolCallBlocked))
+	assert.NotContains(t, output, "id_rsa")
 }
 
 func TestOaiResponsesToChatStreamHandlerConvertsClaudeSSETerminalsAndUsage(t *testing.T) {

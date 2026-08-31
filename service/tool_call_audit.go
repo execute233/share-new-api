@@ -1,18 +1,11 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/sha256"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"path"
 	"regexp"
 	"strings"
-	"sync/atomic"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -23,9 +16,6 @@ import (
 )
 
 const maxToolCallAuditLogArgumentBytes = 64 * 1024
-const maxBufferedToolCallAuditStreamBytes = 64 * 1024 * 1024
-
-var lastToolCallAuditCleanup atomic.Int64
 
 type NormalizedToolCall struct {
 	Protocol     string
@@ -51,175 +41,6 @@ type ToolCallAuditResult struct {
 	Matches       []ToolCallAuditMatch
 	ArgumentsHash string
 	ArgumentsSize int
-}
-
-// PreAuditUpstreamStream buffers an audited upstream SSE response before any
-// bytes reach the client. It reconstructs tool arguments across protocol
-// chunks, evaluates the complete calls, and restores the body for the normal
-// protocol handler when the stream is allowed.
-func PreAuditUpstreamStream(c *gin.Context, channelID int, modelName string, response *http.Response) *types.NewAPIError {
-	if response == nil || response.Body == nil || !setting.ToolCallAuditChannelEnabled(channelID) {
-		return nil
-	}
-	originalBody := response.Body
-	body, err := io.ReadAll(io.LimitReader(originalBody, maxBufferedToolCallAuditStreamBytes+1))
-	_ = originalBody.Close()
-	if err != nil {
-		return types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
-	}
-	if len(body) > maxBufferedToolCallAuditStreamBytes {
-		return types.NewOpenAIError(errors.New("audited upstream stream exceeds safety limit"), types.ErrorCodeToolCallBlocked, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-	}
-	response.Body = io.NopCloser(bytes.NewReader(body))
-	response.ContentLength = int64(len(body))
-
-	type streamCall struct {
-		protocol string
-		callID   string
-		name     string
-		args     strings.Builder
-	}
-	accumulated := make(map[string]*streamCall)
-	completed := make([]NormalizedToolCall, 0)
-	scanner := bufio.NewScanner(bytes.NewReader(body))
-	scanner.Buffer(make([]byte, 64*1024), maxBufferedToolCallAuditStreamBytes)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if data == "" || data == "[DONE]" {
-			continue
-		}
-
-		var chat dto.ChatCompletionsStreamResponse
-		if common.UnmarshalJsonStr(data, &chat) == nil {
-			for _, choice := range chat.Choices {
-				for position, tool := range choice.Delta.ToolCalls {
-					index := position
-					if tool.Index != nil {
-						index = *tool.Index
-					}
-					key := fmt.Sprintf("chat:%d:%d", choice.Index, index)
-					entry := accumulated[key]
-					if entry == nil {
-						entry = &streamCall{protocol: "openai"}
-						accumulated[key] = entry
-					}
-					if tool.ID != "" {
-						entry.callID = tool.ID
-					}
-					if tool.Function.Name != "" {
-						entry.name = tool.Function.Name
-					}
-					entry.args.WriteString(tool.Function.Arguments)
-				}
-			}
-		}
-
-		var responses dto.ResponsesStreamResponse
-		if common.UnmarshalJsonStr(data, &responses) == nil {
-			key := responses.ItemID
-			if key == "" && responses.OutputIndex != nil {
-				key = fmt.Sprintf("%d", *responses.OutputIndex)
-			}
-			if responses.Type == dto.ResponsesOutputTypeItemAdded && responses.Item != nil && responses.Item.Type == dto.BuildInCallFunctionCall {
-				entry := accumulated["responses:"+key]
-				if entry == nil {
-					entry = &streamCall{protocol: "openai_responses"}
-					accumulated["responses:"+key] = entry
-				}
-				entry.callID = responses.Item.CallId
-				entry.name = responses.Item.Name
-				if len(responses.Item.Arguments) > 0 {
-					entry.args.Write(responses.Item.Arguments)
-				}
-			}
-			if responses.Type == "response.function_call_arguments.delta" {
-				entry := accumulated["responses:"+key]
-				if entry == nil {
-					entry = &streamCall{protocol: "openai_responses", callID: responses.ItemID}
-					accumulated["responses:"+key] = entry
-				}
-				entry.args.WriteString(responses.Delta)
-			}
-			if responses.Type == dto.ResponsesOutputTypeItemDone && responses.Item != nil && responses.Item.Type == dto.BuildInCallFunctionCall {
-				entry := accumulated["responses:"+key]
-				if entry == nil {
-					entry = &streamCall{protocol: "openai_responses"}
-					accumulated["responses:"+key] = entry
-				}
-				entry.callID = responses.Item.CallId
-				entry.name = responses.Item.Name
-				if entry.args.Len() == 0 && len(responses.Item.Arguments) > 0 {
-					entry.args.Write(responses.Item.Arguments)
-				}
-			}
-			if responses.Response != nil {
-				for outputIndex, output := range responses.Response.Output {
-					if output.Type != dto.BuildInCallFunctionCall {
-						continue
-					}
-					responseKey := output.CallId
-					if responseKey == "" {
-						responseKey = fmt.Sprintf("completed:%d", outputIndex)
-					}
-					entry := accumulated["responses:"+responseKey]
-					if entry == nil {
-						entry = &streamCall{protocol: "openai_responses"}
-						accumulated["responses:"+responseKey] = entry
-					}
-					entry.callID = output.CallId
-					entry.name = output.Name
-					if entry.args.Len() == 0 && len(output.Arguments) > 0 {
-						entry.args.Write(output.Arguments)
-					}
-				}
-			}
-		}
-
-		var claude dto.ClaudeResponse
-		if common.UnmarshalJsonStr(data, &claude) == nil {
-			key := fmt.Sprintf("claude:%d", claude.GetIndex())
-			if claude.Type == "content_block_start" && claude.ContentBlock != nil && claude.ContentBlock.Type == "tool_use" {
-				accumulated[key] = &streamCall{protocol: "claude", callID: claude.ContentBlock.Id, name: claude.ContentBlock.Name}
-			}
-			if claude.Type == "content_block_delta" && claude.Delta != nil && claude.Delta.PartialJson != nil {
-				entry := accumulated[key]
-				if entry == nil {
-					entry = &streamCall{protocol: "claude"}
-					accumulated[key] = entry
-				}
-				entry.args.WriteString(*claude.Delta.PartialJson)
-			}
-		}
-
-		var gemini dto.GeminiChatResponse
-		if common.UnmarshalJsonStr(data, &gemini) == nil {
-			for candidateIndex, candidate := range gemini.Candidates {
-				for partIndex, part := range candidate.Content.Parts {
-					if part.FunctionCall == nil {
-						continue
-					}
-					call, marshalErr := NormalizedToolCallFromValue("gemini", fmt.Sprintf("%d:%d", candidateIndex, partIndex), part.FunctionCall.FunctionName, part.FunctionCall.Arguments)
-					if marshalErr == nil {
-						completed = append(completed, call)
-					}
-				}
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
-	}
-	for _, entry := range accumulated {
-		if entry.name == "" && entry.args.Len() == 0 {
-			continue
-		}
-		completed = append(completed, NormalizedToolCallFromString(entry.protocol, entry.callID, entry.name, entry.args.String()))
-	}
-	return AuditToolCalls(c, channelID, modelName, completed)
 }
 
 func NewNormalizedToolCall(protocol, callID, toolName string, rawArguments []byte) NormalizedToolCall {
@@ -253,26 +74,20 @@ func NormalizedToolCallFromValue(protocol, callID, toolName string, arguments an
 }
 
 func AuditToolCalls(c *gin.Context, channelID int, modelName string, calls []NormalizedToolCall) *types.NewAPIError {
-	if len(calls) == 0 || !setting.ToolCallAuditChannelEnabled(channelID) {
+	config := setting.GetToolCallAuditSettings()
+	return auditToolCallsWithSettings(c, channelID, modelName, config, calls)
+}
+
+func auditToolCallsWithSettings(c *gin.Context, channelID int, modelName string, config setting.ToolCallAuditSettings, calls []NormalizedToolCall) *types.NewAPIError {
+	if len(calls) == 0 || !toolCallAuditChannelEnabled(config, channelID) {
 		return nil
 	}
-	uniqueCalls := make([]NormalizedToolCall, 0, len(calls))
-	seen := make(map[string]struct{}, len(calls))
-	for _, call := range calls {
-		argumentHash := sha256.Sum256(call.RawArguments)
-		key := fmt.Sprintf("%s\x00%s\x00%s\x00%x", call.Protocol, call.CallID, call.ToolName, argumentHash)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		uniqueCalls = append(uniqueCalls, call)
-	}
 	totalBytes := 0
-	results := make([]ToolCallAuditResult, len(uniqueCalls))
+	results := make([]ToolCallAuditResult, len(calls))
 	blocked := false
-	for i, call := range uniqueCalls {
+	for i, call := range calls {
 		totalBytes += len(call.RawArguments)
-		results[i] = EvaluateToolCallAudit(channelID, call, totalBytes)
+		results[i] = EvaluateToolCallAuditWithSettings(config, channelID, call, totalBytes)
 		if results[i].Blocked {
 			blocked = true
 		}
@@ -282,10 +97,10 @@ func AuditToolCalls(c *gin.Context, channelID int, modelName string, calls []Nor
 	}
 	for i, result := range results {
 		if result.Blocked {
-			RecordToolCallAuditBlock(c, channelID, modelName, result, uniqueCalls[i])
+			RecordToolCallAuditBlock(c, channelID, modelName, config.Version, result, calls[i])
 		}
 	}
-	return types.NewOpenAIError(errors.New("tool call blocked by security policy"), types.ErrorCodeToolCallBlocked, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	return toolCallBlockedError()
 }
 
 func AuditOpenAITextResponse(c *gin.Context, channelID int, modelName string, response *dto.OpenAITextResponse) *types.NewAPIError {
@@ -310,7 +125,7 @@ func AuditResponsesResponse(c *gin.Context, channelID int, modelName string, res
 		if output.Type != dto.BuildInCallFunctionCall {
 			continue
 		}
-		calls = append(calls, NewNormalizedToolCall("openai_responses", output.CallId, output.Name, output.Arguments))
+		calls = append(calls, NormalizedToolCallFromString("openai_responses", output.CallId, output.Name, output.ArgumentsString()))
 	}
 	return AuditToolCalls(c, channelID, modelName, calls)
 }
@@ -385,6 +200,18 @@ func EvaluateToolCallAuditWithSettings(config setting.ToolCallAuditSettings, cha
 		}}
 		return result
 	}
+	if call.Parsed && exceedsJSONDepth(call.Arguments, config.MaxJSONDepth) {
+		result.OverLimit = true
+		result.Blocked = true
+		result.Matches = []ToolCallAuditMatch{{
+			RuleID:   "builtin.json_depth",
+			Name:     "Tool call JSON depth limit exceeded",
+			Category: "resource_limit",
+			Severity: "critical",
+			Reason:   "json_depth_exceeded",
+		}}
+		return result
+	}
 
 	for _, rule := range config.Rules {
 		if !rule.Enabled || !ruleAppliesToTool(rule.ToolNames, call.ToolName) {
@@ -404,6 +231,33 @@ func EvaluateToolCallAuditWithSettings(config setting.ToolCallAuditSettings, cha
 		result.Blocked = true
 	}
 	return result
+}
+
+func exceedsJSONDepth(value any, maxDepth int) bool {
+	type pendingValue struct {
+		value any
+		depth int
+	}
+	pending := []pendingValue{{value: value, depth: 1}}
+	for len(pending) > 0 {
+		last := len(pending) - 1
+		current := pending[last]
+		pending = pending[:last]
+		if current.depth > maxDepth {
+			return true
+		}
+		switch typed := current.value.(type) {
+		case map[string]any:
+			for _, child := range typed {
+				pending = append(pending, pendingValue{value: child, depth: current.depth + 1})
+			}
+		case []any:
+			for _, child := range typed {
+				pending = append(pending, pendingValue{value: child, depth: current.depth + 1})
+			}
+		}
+	}
+	return false
 }
 
 func toolCallAuditChannelEnabled(config setting.ToolCallAuditSettings, channelID int) bool {
@@ -428,7 +282,7 @@ func TestToolCallAuditSettings(config setting.ToolCallAuditSettings, toolName, r
 	return EvaluateToolCallAuditWithSettings(config, 0, call, len(call.RawArguments))
 }
 
-func RecordToolCallAuditBlock(c *gin.Context, channelID int, modelName string, result ToolCallAuditResult, call NormalizedToolCall) {
+func RecordToolCallAuditBlock(c *gin.Context, channelID int, modelName string, policyVersion int, result ToolCallAuditResult, call NormalizedToolCall) {
 	if c == nil || !result.Blocked {
 		return
 	}
@@ -441,14 +295,6 @@ func RecordToolCallAuditBlock(c *gin.Context, channelID int, modelName string, r
 		categories = append(categories, match.Category)
 		severities = append(severities, match.Severity)
 		reasons = append(reasons, match.Reason)
-	}
-	now := time.Now()
-	lastCleanup := lastToolCallAuditCleanup.Load()
-	if now.Unix()-lastCleanup >= int64(time.Hour/time.Second) && lastToolCallAuditCleanup.CompareAndSwap(lastCleanup, now.Unix()) {
-		cutoff := now.Add(-time.Duration(setting.GetToolCallAuditSettings().LogRetentionDays) * 24 * time.Hour).Unix()
-		if err := model.DeleteExpiredToolCallAuditLogs(cutoff); err != nil {
-			common.SysError("failed to delete expired tool call audit logs: " + err.Error())
-		}
 	}
 	loggedArguments := call.RawArguments
 	if len(loggedArguments) > maxToolCallAuditLogArgumentBytes {
@@ -469,7 +315,7 @@ func RecordToolCallAuditBlock(c *gin.Context, channelID int, modelName string, r
 		Categories:    categories,
 		Severities:    severities,
 		Reasons:       reasons,
-		PolicyVersion: setting.GetToolCallAuditSettings().Version,
+		PolicyVersion: policyVersion,
 	})
 }
 
@@ -480,6 +326,23 @@ func ruleMatchesCall(rule setting.ToolCallAuditRule, call NormalizedToolCall, ma
 	}
 	if call.Parsed {
 		values = append(values, argumentValues(call.Arguments, rule.ArgumentPaths, maxDepth, "")...)
+	}
+	if rule.MatchType == "regex" {
+		patterns := make([]*regexp.Regexp, 0, len(rule.Patterns))
+		for _, pattern := range rule.Patterns {
+			compiled, err := regexp.Compile(pattern)
+			if err == nil {
+				patterns = append(patterns, compiled)
+			}
+		}
+		for _, value := range values {
+			for _, pattern := range patterns {
+				if pattern.MatchString(value) {
+					return true
+				}
+			}
+		}
+		return false
 	}
 	for _, value := range values {
 		for _, pattern := range rule.Patterns {
@@ -527,8 +390,8 @@ func argumentValues(value any, paths []string, maxDepth int, currentPath string)
 		return values
 	case []any:
 		values := make([]string, 0)
-		for index, child := range typed {
-			values = append(values, argumentValues(child, paths, maxDepth, fmt.Sprintf("%s[%d]", currentPath, index))...)
+		for _, child := range typed {
+			values = append(values, argumentValues(child, paths, maxDepth, currentPath)...)
 		}
 		return values
 	case string:
@@ -574,6 +437,9 @@ func pathSelected(value string, patterns []string) bool {
 
 func pathMayContainSelection(value string, patterns []string) bool {
 	for _, pattern := range patterns {
+		if strings.Contains(pattern, "*") {
+			return true
+		}
 		if strings.HasPrefix(strings.ToLower(pattern), strings.ToLower(value)+".") {
 			return true
 		}
@@ -589,9 +455,6 @@ func matchAuditPattern(matchType, value, pattern string) bool {
 		return strings.EqualFold(value, pattern)
 	case "glob":
 		matched, err := path.Match(strings.ToLower(pattern), strings.ToLower(value))
-		return err == nil && matched
-	case "regex":
-		matched, err := regexp.MatchString(pattern, value)
 		return err == nil && matched
 	case "keyword_set":
 		for _, word := range setting.SensitiveWords {

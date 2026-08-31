@@ -319,7 +319,7 @@ func RecordToolCallAuditLog(params ToolCallAuditLogParams) {
 		ModelName: params.ModelName,
 		ChannelId: params.ChannelID,
 		RequestId: params.RequestID,
-		Other:     common.MapToJsonStr(adminInfo),
+		Other:     common.MapToJsonStr(map[string]interface{}{"admin_info": adminInfo}),
 	}
 	if err := createLog(log); err != nil {
 		common.SysLog("failed to record tool call audit log: " + err.Error())

@@ -53,3 +53,31 @@ func TestToolCallAuditReturnsMatchingDraftRules(t *testing.T) {
 	assert.True(t, response.Data.Matched)
 	assert.True(t, response.Data.Blocked)
 }
+
+func TestGetToolCallAuditDefaultsReturnsCanonicalRules(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/option/tool-call-audit/defaults", nil)
+
+	GetToolCallAuditDefaults(context)
+
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Rules []setting.ToolCallAuditRule `json:"rules"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	require.NotEmpty(t, response.Data.Rules)
+	var environmentRule *setting.ToolCallAuditRule
+	for i := range response.Data.Rules {
+		if response.Data.Rules[i].ID == "credential-access-env" {
+			environmentRule = &response.Data.Rules[i]
+			break
+		}
+	}
+	require.NotNil(t, environmentRule)
+	assert.Contains(t, environmentRule.Patterns, "git-credentials")
+}

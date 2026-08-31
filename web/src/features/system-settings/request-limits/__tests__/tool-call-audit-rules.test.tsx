@@ -17,9 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
+import * as systemSettingsApi from '../../api'
 import { ToolCallAuditSection } from '../tool-call-audit-section'
 
 const config = JSON.stringify({
@@ -45,6 +47,10 @@ const config = JSON.stringify({
   log_retention_days: 7,
 })
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('tool call audit rule editor', () => {
   test('allows an administrator to disable and delete a rule visually', () => {
     const queryClient = new QueryClient({
@@ -64,6 +70,108 @@ describe('tool call audit rule editor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(screen.queryByText('Rule one')).not.toBeInTheDocument()
+
+    queryClient.clear()
+  })
+
+  test.each(['abc', '1,abc,2', '1,0', '1,2.5'])(
+    'shows a validation error for invalid channel ID input %s',
+    async (channelIds) => {
+      const queryClient = new QueryClient({
+        defaultOptions: { mutations: { retry: false } },
+      })
+      const user = userEvent.setup()
+      const { container } = render(
+        <QueryClientProvider client={queryClient}>
+          <ToolCallAuditSection defaultValues={config} />
+        </QueryClientProvider>
+      )
+
+      const channelInput = screen.getByRole('textbox', {
+        name: 'Channel IDs',
+      })
+      await user.type(channelInput, channelIds)
+      const settingsForm = container.querySelector('form')
+      if (!settingsForm) throw new Error('Expected tool call audit form')
+      fireEvent.submit(settingsForm)
+
+      expect(
+        await screen.findByText(
+          'Channel IDs must be comma-separated positive integers'
+        )
+      ).toBeVisible()
+      expect(channelInput).toHaveAttribute('aria-invalid', 'true')
+
+      queryClient.clear()
+    }
+  )
+
+  test('restores the current default rules from the backend', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const user = userEvent.setup()
+    const getDefaults = vi
+      .spyOn(systemSettingsApi, 'getToolCallAuditDefaults')
+      .mockResolvedValue({
+        success: true,
+        message: '',
+        data: {
+          rules: [
+            {
+              id: 'server-default',
+              name: 'Server default rule',
+              enabled: true,
+              severity: 'critical',
+              category: 'credential_access',
+              tool_names: [],
+              argument_paths: [],
+              match_type: 'contains',
+              patterns: ['git-credentials'],
+            },
+          ],
+        },
+      })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToolCallAuditSection defaultValues={config} />
+      </QueryClientProvider>
+    )
+
+    expect(getDefaults).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Restore defaults' }))
+
+    await waitFor(() => expect(getDefaults).toHaveBeenCalledOnce())
+    expect(await screen.findByText('Server default rule')).toBeVisible()
+    expect(screen.queryByText('Rule one')).not.toBeInTheDocument()
+
+    queryClient.clear()
+  })
+
+  test('keeps the draft rules when loading defaults fails', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const user = userEvent.setup()
+    const getDefaults = vi
+      .spyOn(systemSettingsApi, 'getToolCallAuditDefaults')
+      .mockRejectedValue(new Error('defaults unavailable'))
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToolCallAuditSection defaultValues={config} />
+      </QueryClientProvider>
+    )
+
+    const restoreButton = screen.getByRole('button', {
+      name: 'Restore defaults',
+    })
+    await user.click(restoreButton)
+
+    await waitFor(() => expect(getDefaults).toHaveBeenCalledOnce())
+    await waitFor(() => expect(restoreButton).toBeEnabled())
+    await waitFor(() => expect(screen.getByText('Rule one')).toBeVisible())
 
     queryClient.clear()
   })

@@ -45,6 +45,26 @@ export type ToolCallAuditTestRequest = {
   arguments: string
 }
 
+export type ToolCallAuditRule = {
+  id: string
+  name: string
+  enabled: boolean
+  severity: string
+  category: string
+  tool_names: string[]
+  argument_paths: string[]
+  match_type: string
+  patterns: string[]
+}
+
+export type ToolCallAuditDefaultsResponse = {
+  success: boolean
+  message: string
+  data: {
+    rules: ToolCallAuditRule[]
+  }
+}
+
 export type ToolCallAuditTestResponse = {
   success: boolean
   message: string

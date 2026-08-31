@@ -149,11 +149,14 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	var imageCount int
 	var hasBillableUsageMetadata bool
 	responseText := strings.Builder{}
+	gate := service.NewToolCallAuditStreamGate(c, info.GetChannelID(), info.GetUpstreamModelName(), service.ToolCallAuditStreamGemini)
+	var streamErr *types.NewAPIError
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		var geminiResponse dto.GeminiChatResponse
 		if err := common.UnmarshalJsonStr(data, &geminiResponse); err != nil {
-			sr.Stop(fmt.Errorf("unmarshal: %w", err))
+			streamErr = types.NewOpenAIError(fmt.Errorf("unmarshal: %w", err), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			sr.Stop(streamErr)
 			return
 		}
 
@@ -182,10 +185,31 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			hasBillableUsageMetadata = true
 		}
 
+		if gate.Observe(data) {
+			return
+		}
 		if !callback(data, &geminiResponse) {
-			sr.Stop(fmt.Errorf("gemini callback stopped"))
+			streamErr = types.NewOpenAIError(fmt.Errorf("gemini callback stopped"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			sr.Stop(streamErr)
 		}
 	})
+	if streamErr != nil {
+		return nil, streamErr
+	}
+	pending, auditErr := gate.Finish()
+	if auditErr != nil {
+		_ = helper.ToolCallBlockedStreamError(c, info.RelayFormat)
+		return nil, auditErr
+	}
+	for _, data := range pending {
+		var geminiResponse dto.GeminiChatResponse
+		if err := common.UnmarshalJsonStr(data, &geminiResponse); err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+		if !callback(data, &geminiResponse) {
+			return nil, types.NewOpenAIError(fmt.Errorf("gemini callback stopped"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
+		}
+	}
 
 	if !hasBillableUsageMetadata {
 		if info.ReceivedResponseCount > 0 {
@@ -207,9 +231,6 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 }
 
 func GeminiChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
-	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
-		return nil, auditErr
-	}
 	id := helper.GetResponseID(c)
 	createAt := common.GetTimestamp()
 	finishReason := constant.FinishReasonStop

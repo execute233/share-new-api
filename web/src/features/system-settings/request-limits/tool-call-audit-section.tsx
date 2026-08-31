@@ -17,9 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import * as z from 'zod'
 
 import { JsonCodeEditor } from '@/components/json-code-editor'
@@ -44,85 +46,47 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 
-import { testToolCallAudit } from '../api'
+import { getToolCallAuditDefaults, testToolCallAudit } from '../api'
 import { SettingsForm } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
-const DEFAULT_RULES = [
-  {
-    id: 'credential-access-ssh',
-    name: 'Block SSH private key access',
-    enabled: true,
-    severity: 'critical',
-    category: 'credential_access',
-    tool_names: ['shell', 'read_file', 'filesystem_*'],
-    argument_paths: ['cmd', 'path', 'file', 'input'],
-    match_type: 'contains',
-    patterns: ['.ssh', 'id_rsa', 'id_ed25519', 'id_ecdsa'],
-  },
-  {
-    id: 'credential-access-env',
-    name: 'Block environment credential access',
-    enabled: true,
-    severity: 'critical',
-    category: 'credential_access',
-    tool_names: ['shell', 'read_file', 'filesystem_*'],
-    argument_paths: ['cmd', 'path', 'file', 'input'],
-    match_type: 'contains',
-    patterns: ['.env', '.aws', '.config/gcloud', '.config/azure'],
-  },
-  {
-    id: 'dangerous-shell-exfiltration',
-    name: 'Block shell network exfiltration',
-    enabled: true,
-    severity: 'critical',
-    category: 'network_exfiltration',
-    tool_names: ['shell', 'exec', 'run_*'],
-    argument_paths: ['cmd', 'command'],
-    match_type: 'contains',
-    patterns: ['curl', 'wget', '--data', '$('],
-  },
-  {
-    id: 'environment-dump',
-    name: 'Block environment dumps',
-    enabled: true,
-    severity: 'high',
-    category: 'environment_dump',
-    tool_names: ['shell', 'exec', 'run_*'],
-    argument_paths: ['cmd', 'command'],
-    match_type: 'contains',
-    patterns: ['printenv', 'env ', '/proc/'],
-  },
-  {
-    id: 'encoded-command',
-    name: 'Block encoded shell commands',
-    enabled: true,
-    severity: 'high',
-    category: 'encoded_command',
-    tool_names: ['shell', 'exec', 'run_*'],
-    argument_paths: ['cmd', 'command'],
-    match_type: 'contains',
-    patterns: ['powershell', 'encodedcommand', 'base64'],
-  },
-]
-
 const DEFAULT_CONFIG = {
   version: 1,
   mode: 'disabled',
   channel_ids: [],
-  rules: DEFAULT_RULES,
+  rules: [],
   max_argument_bytes: 65536,
   max_total_argument_bytes: 262144,
   max_json_depth: 32,
   log_retention_days: 7,
 }
 
+const POSITIVE_INTEGER_PATTERN = /^\d+$/
+
+function isChannelIdList(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return true
+
+  return trimmed.split(',').every((item) => {
+    const token = item.trim()
+    if (!POSITIVE_INTEGER_PATTERN.test(token)) return false
+
+    const channelId = Number(token)
+    return Number.isSafeInteger(channelId) && channelId > 0
+  })
+}
+
 const schema = z
   .object({
     mode: z.enum(['disabled', 'audit', 'block']),
-    channelIds: z.string(),
+    channelIds: z
+      .string()
+      .refine(
+        isChannelIdList,
+        'Channel IDs must be comma-separated positive integers'
+      ),
     maxArgumentBytes: z.coerce.number().int().min(1),
     maxTotalArgumentBytes: z.coerce.number().int().min(1),
     maxJsonDepth: z.coerce.number().int().min(1),
@@ -190,10 +154,8 @@ function buildFormValues(value: string): FormInput {
 }
 
 function parseChannelIds(value: string) {
-  return value
-    .split(',')
-    .map((item) => Number.parseInt(item.trim(), 10))
-    .filter((item) => Number.isInteger(item) && item > 0)
+  if (!value.trim()) return []
+  return value.split(',').map((item) => Number(item.trim()))
 }
 
 function parseRules(value: string): RuleDraft[] {
@@ -240,26 +202,35 @@ export function ToolCallAuditSection({
   const rulesText = form.watch('rules')
   const visualRules = useMemo(() => parseRules(rulesText), [rulesText])
 
+  const setRules = (rules: RuleDraft[]) => {
+    form.setValue('rules', JSON.stringify(rules, null, 2), {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }
+
+  const restoreDefaults = useMutation({
+    mutationFn: getToolCallAuditDefaults,
+    onSuccess: (response) => {
+      if (!response.success || !Array.isArray(response.data?.rules)) {
+        toast.error(response.message || t('Request failed'))
+        return
+      }
+      setRules(response.data.rules)
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || t('Request failed'))
+    },
+  })
+
   useEffect(() => {
     form.reset(buildFormValues(defaultValues))
   }, [defaultValues, form])
 
   const onSubmit = async (values: FormValues) => {
-    if (!Array.isArray(parseRules(values.rules))) {
-      form.setError('rules', { message: t('Rules must be a JSON array') })
-      return
-    }
-
     await updateOption.mutateAsync({
       key: 'ToolCallAuditSettings',
       value: JSON.stringify(buildConfig(values)),
-    })
-  }
-
-  const setRules = (rules: RuleDraft[]) => {
-    form.setValue('rules', JSON.stringify(rules, null, 2), {
-      shouldDirty: true,
-      shouldValidate: true,
     })
   }
 
@@ -333,7 +304,7 @@ export function ToolCallAuditSection({
                 </Select>
                 <FormDescription>
                   {t(
-                    'Audit mode records matches; block mode stops matched tool calls.'
+                    'Audit mode evaluates and allows matches without saving logs; block mode rejects matches and records rejection logs.'
                   )}
                 </FormDescription>
                 <FormMessage />
@@ -466,7 +437,8 @@ export function ToolCallAuditSection({
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => setRules(DEFAULT_RULES)}
+                  onClick={() => restoreDefaults.mutate()}
+                  disabled={restoreDefaults.isPending}
                 >
                   {t('Restore defaults')}
                 </Button>
@@ -478,7 +450,7 @@ export function ToolCallAuditSection({
                     setRules([
                       ...visualRules,
                       {
-                        id: `custom-rule-${visualRules.length + 1}`,
+                        id: `custom-rule-${globalThis.crypto.randomUUID()}`,
                         name: t('New rule'),
                         enabled: true,
                         severity: 'medium',

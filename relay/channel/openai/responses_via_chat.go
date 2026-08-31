@@ -69,9 +69,6 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 	if resp == nil || resp.Body == nil {
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
-	if auditErr := service.PreAuditUpstreamStream(c, info.GetChannelID(), info.GetUpstreamModelName(), resp); auditErr != nil {
-		return nil, auditErr
-	}
 	defer service.CloseResponseBodyGracefully(resp)
 
 	responseID := helper.GetResponseID(c)
@@ -83,6 +80,7 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
 	streamErr := (*types.NewAPIError)(nil)
+	gate := service.NewToolCallAuditStreamGate(c, info.GetChannelID(), info.GetUpstreamModelName(), service.ToolCallAuditStreamOpenAIChat)
 
 	sendEvent := func(event relayconvert.ChatToResponsesStreamEvent) bool {
 		data, err := common.Marshal(event.Payload)
@@ -94,50 +92,65 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		return true
 	}
 
-	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+	processData := func(data string) bool {
 		if streamErr != nil {
-			sr.Stop(streamErr)
-			return
+			return false
 		}
 
 		var errorResp dto.OpenAITextResponse
 		if err := common.UnmarshalJsonStr(data, &errorResp); err == nil {
 			if oaiError := errorResp.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 				streamErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
-				sr.Stop(streamErr)
-				return
+				return false
 			}
 		}
 
 		var chunk dto.ChatCompletionsStreamResponse
 		if err := common.UnmarshalJsonStr(data, &chunk); err != nil {
 			logger.LogError(c, "failed to unmarshal chat stream response: "+err.Error())
-			sr.Error(err)
-			return
+			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			return false
 		}
 
 		results, err := relayconvert.ConvertStreamResponseChunk(c, info, state, &chunk)
 		if err != nil {
 			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
-			sr.Stop(streamErr)
-			return
+			return false
 		}
 		for _, result := range results {
 			event, ok := result.Value.(relayconvert.ChatToResponsesStreamEvent)
 			if !ok {
 				streamErr = types.NewOpenAIError(fmt.Errorf("expected OAI responses stream event, got %T", result.Value), types.ErrorCodeBadResponse, http.StatusInternalServerError)
-				sr.Stop(streamErr)
-				return
+				return false
 			}
 			if !sendEvent(event) {
-				sr.Stop(streamErr)
-				return
+				return false
 			}
 		}
-	})
+		return true
+	}
 
+	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		if gate.Observe(data) {
+			return
+		}
+		if !processData(data) {
+			sr.Stop(streamErr)
+		}
+	})
 	if streamErr != nil {
 		return nil, streamErr
+	}
+
+	pending, auditErr := gate.Finish()
+	if auditErr != nil {
+		_ = helper.ToolCallBlockedStreamError(c, info.RelayFormat)
+		return nil, auditErr
+	}
+	for _, data := range pending {
+		if !processData(data) {
+			return nil, streamErr
+		}
 	}
 
 	usage := state.Usage()
