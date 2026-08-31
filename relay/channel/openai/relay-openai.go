@@ -105,7 +105,6 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		logger.LogError(c, "invalid response or response body")
 		return nil, types.NewOpenAIError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse, http.StatusInternalServerError)
 	}
-
 	defer service.CloseResponseBodyGracefully(resp)
 
 	model := info.UpstreamModelName
@@ -123,8 +122,27 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	// 检查是否为音频模型
 	isAudioModel := strings.Contains(strings.ToLower(model), "audio")
+	gate := service.NewToolCallAuditStreamGate(c, info.GetChannelID(), info.GetUpstreamModelName(), service.ToolCallAuditStreamOpenAIChat)
+	var streamErr *types.NewAPIError
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		var errorResponse dto.OpenAITextResponse
+		if common.UnmarshalJsonStr(data, &errorResponse) == nil {
+			if upstreamError := errorResponse.GetOpenAIError(); upstreamError != nil && upstreamError.Type != "" {
+				streamErr = types.WithOpenAIError(*upstreamError, resp.StatusCode)
+				sr.Stop(streamErr)
+				return
+			}
+		}
+		if gate.Observe(data) {
+			if lastStreamData != "" {
+				if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
+					sr.Error(err)
+				}
+				lastStreamData = ""
+			}
+			return
+		}
 		if lastStreamData != "" {
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
@@ -145,6 +163,31 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 	})
+	if streamErr != nil {
+		return nil, streamErr
+	}
+	pending, auditErr := gate.Finish()
+	if auditErr != nil {
+		_ = helper.ToolCallBlockedStreamError(c, info.RelayFormat)
+		return nil, auditErr
+	}
+	if gate.HasTool() {
+		for _, data := range pending {
+			if lastStreamData != "" {
+				if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
+					return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+				}
+			}
+			if isAudioModel && lastStreamData != "" {
+				secondLastStreamData = lastStreamData
+			}
+			lastStreamData = data
+			collectStreamFunctionCallNames(data, seenStreamToolCalls, &streamFunctionCallNames)
+			if err := processTokenData(info.RelayMode, data, &responseTextBuilder, &toolCount); err != nil {
+				return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			}
+		}
+	}
 
 	// 对音频模型，从倒数第二个stream data中提取usage信息
 	if isAudioModel && secondLastStreamData != "" {
@@ -226,7 +269,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
-	logger.LogDebug(c, "upstream response body: %s", responseBody)
+	logger.LogDebug(c, "upstream response body received: bytes=%d", len(responseBody))
 	// Unmarshal to simpleResponse
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
@@ -235,6 +278,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	if oaiError := simpleResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
+	}
+	if auditErr := service.AuditOpenAITextResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &simpleResponse); auditErr != nil {
+		return nil, auditErr
 	}
 
 	for _, choice := range simpleResponse.Choices {

@@ -20,6 +20,7 @@ import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
+import { ToolCallAuditSection } from '../request-limits/tool-call-audit-section'
 import type { SecuritySettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 
@@ -45,13 +46,17 @@ const SECURITY_SECTIONS = [
     id: 'sensitive-words',
     titleKey: 'Sensitive Words',
     build: (settings: SecuritySettings) => (
-      <SensitiveWordsSection
-        defaultValues={{
-          CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
-          CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
-          SensitiveWords: settings.SensitiveWords,
-        }}
-      />
+      <>
+        <SensitiveWordsSection
+          defaultValues={{
+            CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
+            CheckSensitiveOnPromptEnabled:
+              settings.CheckSensitiveOnPromptEnabled,
+            SensitiveWords: settings.SensitiveWords,
+          }}
+        />
+        <ToolCallAuditSection defaultValues={settings.ToolCallAuditSettings} />
+      </>
     ),
   },
   {

@@ -24,6 +24,9 @@ import type {
   SystemOptionsResponse,
   SystemTaskListResponse,
   SystemTaskResponse,
+  ToolCallAuditDefaultsResponse,
+  ToolCallAuditTestRequest,
+  ToolCallAuditTestResponse,
   UpdateOptionRequest,
   UpdateOptionResponse,
   UpstreamChannelsResponse,
@@ -37,6 +40,21 @@ export async function getSystemOptions() {
 
 export async function updateSystemOption(request: UpdateOptionRequest) {
   const res = await api.put<UpdateOptionResponse>('/api/option/', request)
+  return res.data
+}
+
+export async function testToolCallAudit(request: ToolCallAuditTestRequest) {
+  const res = await api.post<ToolCallAuditTestResponse>(
+    '/api/option/tool-call-audit/test',
+    request
+  )
+  return res.data
+}
+
+export async function getToolCallAuditDefaults() {
+  const res = await api.get<ToolCallAuditDefaultsResponse>(
+    '/api/option/tool-call-audit/defaults'
+  )
   return res.data
 }
 
