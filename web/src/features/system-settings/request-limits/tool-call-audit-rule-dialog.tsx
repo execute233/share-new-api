@@ -221,9 +221,7 @@ export function ToolCallAuditRuleDialog({
             argument_paths: Array.isArray(editData.argument_paths)
               ? editData.argument_paths
               : [],
-            patterns: Array.isArray(editData.patterns)
-              ? editData.patterns
-              : [],
+            patterns: Array.isArray(editData.patterns) ? editData.patterns : [],
           }
         : {
             id: newRuleId(),
@@ -272,7 +270,10 @@ export function ToolCallAuditRuleDialog({
       <Form {...form}>
         <form
           id={RULE_DIALOG_FORM_ID}
-          onSubmit={form.handleSubmit(handleSubmit)}
+          onSubmit={(event) => {
+            event.stopPropagation()
+            void form.handleSubmit(handleSubmit)(event)
+          }}
           className='space-y-4'
         >
           <FormField
@@ -444,7 +445,9 @@ export function ToolCallAuditRuleDialog({
                   />
                 </FormControl>
                 <FormDescription>
-                  {t('Tool names matched against this rule. Empty matches all tools.')}
+                  {t(
+                    'Tool names matched against this rule. Empty matches all tools.'
+                  )}
                 </FormDescription>
                 <FormMessage />
               </FormItem>

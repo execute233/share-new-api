@@ -197,7 +197,9 @@ describe('tool call audit rule editor', () => {
 
     expect(await screen.findByText('Block curl')).toBeVisible()
     await waitFor(() =>
-      expect(document.querySelector('form#tool-call-audit-rule-form')).toBeNull()
+      expect(
+        document.querySelector('form#tool-call-audit-rule-form')
+      ).toBeNull()
     )
 
     queryClient.clear()
