@@ -175,4 +175,87 @@ describe('tool call audit rule editor', () => {
 
     queryClient.clear()
   })
+
+  test('adds a rule through the rule dialog', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToolCallAuditSection defaultValues={config} />
+      </QueryClientProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Add rule' }))
+    await user.type(screen.getByLabelText('Rule name'), 'Block curl')
+    await user.type(screen.getByPlaceholderText('Add pattern'), 'curl{Enter}')
+    const dialogForm = document.querySelector('form#tool-call-audit-rule-form')
+    if (!dialogForm) throw new Error('Expected rule dialog form')
+    fireEvent.submit(dialogForm)
+
+    expect(await screen.findByText('Block curl')).toBeVisible()
+    await waitFor(() =>
+      expect(document.querySelector('form#tool-call-audit-rule-form')).toBeNull()
+    )
+
+    queryClient.clear()
+  })
+
+  test('edits a rule through the rule dialog', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToolCallAuditSection defaultValues={config} />
+      </QueryClientProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const nameInput = screen.getByLabelText('Rule name')
+    expect(nameInput).toHaveValue('Rule one')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Rule one renamed')
+    const dialogForm = document.querySelector('form#tool-call-audit-rule-form')
+    if (!dialogForm) throw new Error('Expected rule dialog form')
+    fireEvent.submit(dialogForm)
+
+    expect(await screen.findByText('Rule one renamed')).toBeVisible()
+    expect(screen.queryByText('Rule one')).not.toBeInTheDocument()
+
+    queryClient.clear()
+  })
+
+  test('blocks switching to visual mode when the rules JSON is invalid', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ToolCallAuditSection defaultValues={config} />
+      </QueryClientProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Switch to JSON' }))
+    const jsonEditor = screen.getByRole('textbox', {
+      name: 'Tool audit rules JSON',
+    })
+    fireEvent.input(jsonEditor, { target: { value: '{invalid json' } })
+    await user.click(screen.getByRole('button', { name: 'Switch to Visual' }))
+
+    expect(
+      screen.getByRole('textbox', { name: 'Tool audit rules JSON' })
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Add rule' })
+    ).not.toBeInTheDocument()
+
+    queryClient.clear()
+  })
 })

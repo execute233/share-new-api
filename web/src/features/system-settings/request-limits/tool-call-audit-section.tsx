@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
+import { Code2, Eye } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -51,6 +52,10 @@ import { SettingsForm } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+import {
+  ToolCallAuditRuleDialog,
+  type ToolCallAuditRuleDraft,
+} from './tool-call-audit-rule-dialog'
 
 const DEFAULT_CONFIG = {
   version: 1,
@@ -111,15 +116,6 @@ type ToolCallAuditSectionProps = {
   defaultValues: string
 }
 
-type RuleDraft = {
-  id?: string
-  name?: string
-  enabled?: boolean
-  severity?: string
-  category?: string
-  [key: string]: unknown
-}
-
 function parseConfig(value: string) {
   try {
     const parsed = JSON.parse(value || '{}')
@@ -158,7 +154,7 @@ function parseChannelIds(value: string) {
   return value.split(',').map((item) => Number(item.trim()))
 }
 
-function parseRules(value: string): RuleDraft[] {
+function parseRules(value: string): ToolCallAuditRuleDraft[] {
   try {
     const parsed = JSON.parse(value || '[]')
     return Array.isArray(parsed) ? parsed : []
@@ -199,10 +195,15 @@ export function ToolCallAuditSection({
   )
   const [testResult, setTestResult] = useState<string>('')
   const [isTesting, setIsTesting] = useState(false)
+  const [editMode, setEditMode] = useState<'visual' | 'json'>('visual')
+  const [ruleDialogOpen, setRuleDialogOpen] = useState(false)
+  const [editingRule, setEditingRule] = useState<ToolCallAuditRuleDraft | null>(
+    null
+  )
   const rulesText = form.watch('rules')
   const visualRules = useMemo(() => parseRules(rulesText), [rulesText])
 
-  const setRules = (rules: RuleDraft[]) => {
+  const setRules = (rules: ToolCallAuditRuleDraft[]) => {
     form.setValue('rules', JSON.stringify(rules, null, 2), {
       shouldDirty: true,
       shouldValidate: true,
@@ -261,6 +262,42 @@ export function ToolCallAuditSection({
       setIsTesting(false)
     }
   })
+
+  const handleToggleEditMode = () => {
+    if (editMode === 'json') {
+      try {
+        const parsed = JSON.parse(rulesText || '[]')
+        if (!Array.isArray(parsed)) throw new Error()
+      } catch {
+        toast.error(t('Rules must be a valid JSON array'))
+        return
+      }
+    }
+    setEditMode((prev) => (prev === 'visual' ? 'json' : 'visual'))
+  }
+
+  const openAddRule = () => {
+    setEditingRule(null)
+    setRuleDialogOpen(true)
+  }
+
+  const openEditRule = (rule: ToolCallAuditRuleDraft) => {
+    setEditingRule(rule)
+    setRuleDialogOpen(true)
+  }
+
+  const handleSaveRule = (rule: ToolCallAuditRuleDraft) => {
+    const next = [...visualRules]
+    const index = next.findIndex((item) => item.id === rule.id)
+    if (index >= 0) {
+      next[index] = rule
+    } else {
+      next.push(rule)
+    }
+    setRules(next)
+    setRuleDialogOpen(false)
+    setEditingRule(null)
+  }
 
   return (
     <SettingsSection title={t('Upstream Tool Call Audit')}>
@@ -442,94 +479,121 @@ export function ToolCallAuditSection({
                 >
                   {t('Restore defaults')}
                 </Button>
+                {editMode === 'visual' && (
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={openAddRule}
+                  >
+                    {t('Add rule')}
+                  </Button>
+                )}
                 <Button
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() =>
-                    setRules([
-                      ...visualRules,
-                      {
-                        id: `custom-rule-${globalThis.crypto.randomUUID()}`,
-                        name: t('New rule'),
-                        enabled: true,
-                        severity: 'medium',
-                        category: 'secret_pattern',
-                        tool_names: [],
-                        argument_paths: [],
-                        match_type: 'contains',
-                        patterns: ['replace-me'],
-                      },
-                    ])
-                  }
+                  onClick={handleToggleEditMode}
                 >
-                  {t('Add rule')}
+                  {editMode === 'visual' ? (
+                    <>
+                      <Code2 className='mr-2 h-4 w-4' />
+                      {t('Switch to JSON')}
+                    </>
+                  ) : (
+                    <>
+                      <Eye className='mr-2 h-4 w-4' />
+                      {t('Switch to Visual')}
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
-            {visualRules.map((rule, index) => (
-              <div
-                key={rule.id || index}
-                className='border-border flex items-center gap-3 rounded-lg border p-3'
-              >
-                <Switch
-                  aria-label={t('Enabled')}
-                  checked={rule.enabled !== false}
-                  onCheckedChange={(enabled) => {
-                    const next = [...visualRules]
-                    next[index] = { ...rule, enabled }
-                    setRules(next)
-                  }}
-                />
-                <div className='min-w-0 flex-1'>
-                  <p className='truncate text-sm font-medium'>
-                    {rule.name || rule.id || t('New rule')}
-                  </p>
-                  <p className='text-muted-foreground text-xs'>
-                    {[rule.category, rule.severity].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-                <Button
-                  type='button'
-                  variant='destructive'
-                  size='sm'
-                  onClick={() =>
-                    setRules(
-                      visualRules.filter((_, ruleIndex) => ruleIndex !== index)
-                    )
-                  }
-                >
-                  {t('Delete')}
-                </Button>
+            {editMode === 'visual' ? (
+              <div className='space-y-3'>
+                {visualRules.map((rule, index) => (
+                  <div
+                    key={rule.id || index}
+                    className='border-border flex items-center gap-3 rounded-lg border p-3'
+                  >
+                    <Switch
+                      aria-label={t('Enabled')}
+                      checked={rule.enabled !== false}
+                      onCheckedChange={(enabled) => {
+                        const next = [...visualRules]
+                        next[index] = { ...rule, enabled }
+                        setRules(next)
+                      }}
+                    />
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate text-sm font-medium'>
+                        {rule.name || rule.id || t('New rule')}
+                      </p>
+                      <p className='text-muted-foreground text-xs'>
+                        {[rule.category, rule.severity]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() => openEditRule(rule)}
+                    >
+                      {t('Edit')}
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='destructive'
+                      size='sm'
+                      onClick={() =>
+                        setRules(
+                          visualRules.filter(
+                            (_, ruleIndex) => ruleIndex !== index
+                          )
+                        )
+                      }
+                    >
+                      {t('Delete')}
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          <FormField
-            control={form.control}
-            name='rules'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t('Tool audit rules JSON')}</FormLabel>
-                <FormControl>
-                  <JsonCodeEditor
-                    value={field.value}
-                    onChange={field.onChange}
-                    name={field.name}
-                    onBlur={field.onBlur}
-                    textareaRef={field.ref}
-                    heightClassName='h-96 min-h-96'
-                  />
-                </FormControl>
-                <FormDescription>
-                  {t(
-                    'Rules use contains, exact, glob, regex, or keyword_set matching.'
-                  )}
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
+            ) : (
+              <FormField
+                control={form.control}
+                name='rules'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Tool audit rules JSON')}</FormLabel>
+                    <FormControl>
+                      <JsonCodeEditor
+                        value={field.value}
+                        onChange={field.onChange}
+                        name={field.name}
+                        onBlur={field.onBlur}
+                        textareaRef={field.ref}
+                        heightClassName='h-96 min-h-96'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Rules use contains, exact, glob, regex, or keyword_set matching.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
-          />
+            <ToolCallAuditRuleDialog
+              open={ruleDialogOpen}
+              onOpenChange={setRuleDialogOpen}
+              editData={editingRule}
+              onSave={handleSaveRule}
+            />
+          </div>
 
           <div className='space-y-3 rounded-lg border p-4'>
             <FormLabel>{t('Test rules')}</FormLabel>
