@@ -39,49 +39,6 @@ export type UpdateOptionResponse = {
   message: string
 }
 
-export type ToolCallAuditTestRequest = {
-  settings: Record<string, unknown>
-  tool_name: string
-  arguments: string
-}
-
-export type ToolCallAuditRule = {
-  id: string
-  name: string
-  enabled: boolean
-  severity: string
-  category: string
-  tool_names: string[]
-  argument_paths: string[]
-  match_type: string
-  patterns: string[]
-}
-
-export type ToolCallAuditDefaultsResponse = {
-  success: boolean
-  message: string
-  data: {
-    rules: ToolCallAuditRule[]
-  }
-}
-
-export type ToolCallAuditTestResponse = {
-  success: boolean
-  message: string
-  data: {
-    matched: boolean
-    blocked: boolean
-    over_limit: boolean
-    matches: Array<{
-      rule_id: string
-      name: string
-      category: string
-      severity: string
-      reason: string
-    }>
-  }
-}
-
 export type SystemTaskStatus = 'pending' | 'running' | 'succeeded' | 'failed'
 
 export type SystemTask<
@@ -338,7 +295,6 @@ export type SecuritySettings = {
   CheckSensitiveEnabled: boolean
   CheckSensitiveOnPromptEnabled: boolean
   SensitiveWords: string
-  ToolCallAuditSettings: string
   'fetch_setting.enable_ssrf_protection': boolean
   'fetch_setting.allow_private_ip': boolean
   'fetch_setting.domain_filter_mode': boolean

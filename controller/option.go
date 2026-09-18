@@ -8,7 +8,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
 	"github.com/QuantumNous/new-api/setting/model_setting"
@@ -138,22 +137,6 @@ func UpdateOption(c *gin.Context) {
 		option.Value = fmt.Sprintf("%v", option.Value)
 	}
 	switch option.Key {
-	case setting.ToolCallAuditOptionKey:
-		var configValue setting.ToolCallAuditSettings
-		if err = common.UnmarshalJsonStr(option.Value.(string), &configValue); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
-		if err = setting.ValidateToolCallAuditSettings(configValue); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
 	case "oidc.enabled":
 		if option.Value == "true" && system_setting.GetOIDCSettings().ClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
@@ -335,34 +318,5 @@ func UpdateOption(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-	})
-}
-
-type ToolCallAuditTestRequest struct {
-	Settings  setting.ToolCallAuditSettings `json:"settings"`
-	ToolName  string                        `json:"tool_name"`
-	Arguments string                        `json:"arguments"`
-}
-
-func GetToolCallAuditDefaults(c *gin.Context) {
-	common.ApiSuccess(c, gin.H{"rules": setting.DefaultToolCallAuditRules()})
-}
-
-func TestToolCallAudit(c *gin.Context) {
-	var request ToolCallAuditTestRequest
-	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	if err := setting.ValidateToolCallAuditSettings(request.Settings); err != nil {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
-		return
-	}
-	result := service.TestToolCallAuditSettings(request.Settings, request.ToolName, request.Arguments)
-	common.ApiSuccess(c, gin.H{
-		"matched":    len(result.Matches) > 0,
-		"blocked":    result.Blocked,
-		"over_limit": result.OverLimit,
-		"matches":    result.Matches,
 	})
 }

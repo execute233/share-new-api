@@ -25,7 +25,7 @@ func GeminiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
-	logger.LogDebug(c, "Gemini responses response body received: bytes=%d", len(responseBody))
+	logger.LogDebug(c, "Gemini responses response body: %s", responseBody)
 
 	var geminiResponse dto.GeminiChatResponse
 	if err := common.Unmarshal(responseBody, &geminiResponse); err != nil {
@@ -51,9 +51,6 @@ func GeminiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	}
 
 	chatResp := responseGeminiChat2OpenAI(c, &geminiResponse)
-	if auditErr := service.AuditGeminiResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &geminiResponse); auditErr != nil {
-		return nil, auditErr
-	}
 	chatResp.Model = info.UpstreamModelName
 	if responseID := helper.GetResponseID(c); responseID != "" {
 		chatResp.Id = responseID

@@ -33,9 +33,6 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	if oaiError := responsesResponse.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
-	if auditErr := service.AuditResponsesResponse(c, info.GetChannelID(), info.GetUpstreamModelName(), &responsesResponse); auditErr != nil {
-		return nil, auditErr
-	}
 
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
@@ -80,20 +77,22 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		logger.LogError(c, "invalid response or response body")
 		return nil, types.NewError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse)
 	}
+
 	defer service.CloseResponseBodyGracefully(resp)
 
-	usage := &dto.Usage{}
+	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
 	imageCounter := &relaycommon.ImageGenerationCallCounter{}
 	imageCommitted := false
-	dropPendingTools := false
-	gate := service.NewToolCallAuditStreamGate(c, info.GetChannelID(), info.GetUpstreamModelName(), service.ToolCallAuditStreamResponses)
 
-	processData := func(data string) *types.NewAPIError {
+	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+
+		// 检查当前数据是否包含 completed 状态和 usage 信息
 		var streamResponse dto.ResponsesStreamResponse
 		if err := common.UnmarshalJsonStr(data, &streamResponse); err != nil {
 			logger.LogError(c, "failed to unmarshal stream response: "+err.Error())
-			return types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
+			sr.Error(err)
+			return
 		}
 		sendResponsesStreamData(c, streamResponse, data)
 		switch streamResponse.Type {
@@ -117,33 +116,29 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				if !imageCommitted {
 					if relaycommon.IsNonBillableResponsesStatus(streamResponse.Response.Status) {
 						imageCounter.Reset()
+						imageCounter.Commit(info)
+						imageCommitted = true
 					} else {
 						for i := range streamResponse.Response.Output {
 							idx := i
 							imageCounter.Observe(&streamResponse.Response.Output[i], &idx)
 						}
+						imageCounter.Commit(info)
+						imageCommitted = true
 					}
-					imageCounter.Commit(info)
-					imageCommitted = true
 				}
 			} else if !imageCommitted {
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
-		case "response.error", "response.failed", "response.cancelled", "response.canceled":
-			dropPendingTools = true
-			if !imageCommitted {
-				imageCounter.Reset()
-				imageCounter.Commit(info)
-				imageCommitted = true
-			}
-		case "response.incomplete":
+		case "response.failed", "response.incomplete", "response.cancelled", "response.canceled":
 			if !imageCommitted {
 				imageCounter.Reset()
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
 		case "response.output_text.delta":
+			// 处理输出文本
 			responseTextBuilder.WriteString(streamResponse.Delta)
 		case dto.ResponsesOutputTypeItemDone:
 			if streamResponse.Item != nil {
@@ -161,44 +156,23 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				}
 			}
 		}
-		return nil
-	}
-
-	var streamErr *types.NewAPIError
-	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
-		if gate.Observe(data) {
-			return
-		}
-		if streamErr = processData(data); streamErr != nil {
-			sr.Stop(streamErr)
-		}
 	})
-	if streamErr != nil {
-		return nil, streamErr
-	}
-	if dropPendingTools {
-		gate = nil
-	}
-
-	pending, auditErr := gate.Finish()
-	if auditErr != nil {
-		_ = helper.ToolCallBlockedStreamError(c, info.RelayFormat)
-		return nil, auditErr
-	}
-	for _, data := range pending {
-		if streamErr = processData(data); streamErr != nil {
-			return nil, streamErr
-		}
-	}
 
 	if usage.CompletionTokens == 0 {
-		if text := responseTextBuilder.String(); text != "" {
-			usage.CompletionTokens = service.CountTextToken(text, info.UpstreamModelName)
+		// 计算输出文本的 token 数量
+		tempStr := responseTextBuilder.String()
+		if len(tempStr) > 0 {
+			// 非正常结束，使用输出文本的 token 数量
+			completionTokens := service.CountTextToken(tempStr, info.UpstreamModelName)
+			usage.CompletionTokens = completionTokens
 		}
 	}
+
 	if usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
 		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
+
 	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+
 	return usage, nil
 }

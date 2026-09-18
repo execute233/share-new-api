@@ -7,7 +7,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,32 +33,6 @@ func FlushWriter(c *gin.Context) (err error) {
 
 	flusher.Flush()
 	return nil
-}
-
-func ToolCallBlockedStreamError(c *gin.Context, relayFormat types.RelayFormat) error {
-	requestID := c.GetString(common.RequestIdKey)
-	message := common.MessageWithRequestId("tool call blocked by security policy", requestID)
-	code := string(types.ErrorCodeToolCallBlocked)
-	var payload any
-	switch relayFormat {
-	case types.RelayFormatOpenAIResponses:
-		payload = gin.H{"type": "error", "code": code, "message": message, "param": nil, "request_id": requestID}
-	case types.RelayFormatClaude:
-		payload = gin.H{"type": "error", "error": gin.H{"type": code, "code": code, "message": message}}
-	case types.RelayFormatGemini:
-		payload = gin.H{"error": gin.H{"code": http.StatusBadRequest, "status": code, "message": message}}
-	default:
-		payload = gin.H{"error": gin.H{"type": "new_api_error", "code": code, "message": message}}
-	}
-	data, err := common.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	if relayFormat == types.RelayFormatOpenAIResponses || relayFormat == types.RelayFormatClaude {
-		c.Render(-1, common.CustomEvent{Data: "event: error\n"})
-	}
-	c.Render(-1, common.CustomEvent{Data: "data: " + string(data)})
-	return FlushWriter(c)
 }
 
 func requestContextDone(c *gin.Context) bool {

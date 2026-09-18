@@ -813,53 +813,6 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </DetailSection>
         )}
 
-        {props.isAdmin && other?.admin_info?.tool_call_audit && (
-          <DetailSection
-            icon={<AlertTriangle className='size-3.5' aria-hidden='true' />}
-            label={t('Tool Call Audit')}
-            variant='danger'
-          >
-            <DetailRow
-              label={t('Tool name')}
-              value={other.admin_info.tool_call_audit.tool_name || '-'}
-              mono
-            />
-            <DetailRow
-              label={t('Protocol')}
-              value={other.admin_info.tool_call_audit.protocol || '-'}
-              mono
-            />
-            <DetailRow
-              label={t('Rules')}
-              value={(other.admin_info.tool_call_audit.rule_ids || []).join(
-                ', '
-              )}
-              mono
-            />
-            <DetailRow
-              label={t('Category')}
-              value={(other.admin_info.tool_call_audit.categories || []).join(
-                ', '
-              )}
-            />
-            <DetailRow
-              label={t('Size')}
-              value={String(
-                other.admin_info.tool_call_audit.arguments_size ?? 0
-              )}
-              mono
-            />
-            <div className='space-y-1'>
-              <p className='text-muted-foreground text-xs'>
-                {t('Tool arguments')}
-              </p>
-              <pre className='bg-muted max-h-64 overflow-auto rounded-md p-2 text-xs break-all whitespace-pre-wrap'>
-                {other.admin_info.tool_call_audit.arguments || ''}
-              </pre>
-            </div>
-          </DetailSection>
-        )}
-
         {/* Reject reason (admin only) */}
         {props.isAdmin && other?.reject_reason && (
           <DetailSection

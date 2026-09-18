@@ -112,7 +112,6 @@ func InitOptionMap() {
 	common.OptionMap["CheckSensitiveOnPromptEnabled"] = strconv.FormatBool(setting.CheckSensitiveOnPromptEnabled)
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
-	common.OptionMap[setting.ToolCallAuditOptionKey] = setting.ToolCallAuditSettingsToJSONString()
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
@@ -148,13 +147,6 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
-	if key == setting.ToolCallAuditOptionKey {
-		var configValue setting.ToolCallAuditSettings
-		if err := common.UnmarshalJsonStr(value, &configValue); err != nil {
-			return err
-		}
-		return setting.ValidateToolCallAuditSettings(configValue)
-	}
 	if key == operation_setting.ToolPriceOptionKey {
 		return operation_setting.ValidateToolPricesJSON(value)
 	}
@@ -225,15 +217,6 @@ func updateOptionMap(key string, value string) (err error) {
 	if key == retiredThemeOptionKey {
 		common.OptionMapRWMutex.Lock()
 		delete(common.OptionMap, key)
-		common.OptionMapRWMutex.Unlock()
-		return nil
-	}
-	if key == setting.ToolCallAuditOptionKey {
-		if err := setting.UpdateToolCallAuditSettings(value); err != nil {
-			return err
-		}
-		common.OptionMapRWMutex.Lock()
-		common.OptionMap[key] = value
 		common.OptionMapRWMutex.Unlock()
 		return nil
 	}
