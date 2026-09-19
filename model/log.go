@@ -251,6 +251,34 @@ func RecordOperationAuditLog(logUserId int, content string, ip string, action st
 	}
 }
 
+func RecordTopupLog(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
+	username, _ := GetUsernameById(userId, false)
+	adminInfo := map[string]interface{}{
+		"server_ip":               common.GetIp(),
+		"node_name":               common.NodeName,
+		"caller_ip":               callerIp,
+		"payment_method":          paymentMethod,
+		"callback_payment_method": callbackPaymentMethod,
+		"version":                 common.Version,
+	}
+	other := map[string]interface{}{
+		"admin_info": adminInfo,
+	}
+	log := &Log{
+		UserId:    userId,
+		Username:  username,
+		CreatedAt: common.GetTimestamp(),
+		Type:      LogTypeTopup,
+		Content:   content,
+		Ip:        callerIp,
+		Other:     common.MapToJsonStr(other),
+	}
+	err := createLog(log)
+	if err != nil {
+		common.SysLog("failed to record topup log: " + err.Error())
+	}
+}
+
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other map[string]interface{}) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))

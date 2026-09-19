@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	codexLatestReleaseURL            = "https://api.github.com/repos/openai/codex/releases/latest"
-	codexClientVersionCacheTTL       = time.Hour
-	codexClientVersionFailureCooldown = time.Minute
+	codexLatestReleaseURL      = "https://api.github.com/repos/openai/codex/releases/latest"
+	codexClientVersionCacheTTL = time.Hour
 )
 
 type codexClientVersionCache struct {
@@ -45,8 +44,6 @@ func (cache *codexClientVersionCache) get(ctx context.Context, client *http.Clie
 			cache.expiresAt = now.Add(codexClientVersionCacheTTL)
 			return cache.version, nil
 		}
-		// 失败也冷却：无旧缓存时避免热路径每请求重试网络。
-		cache.expiresAt = now.Add(codexClientVersionFailureCooldown)
 		return "", err
 	}
 

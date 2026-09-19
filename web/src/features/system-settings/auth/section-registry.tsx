@@ -49,6 +49,12 @@ const AUTH_SECTIONS = [
       <OAuthSection
         serverAddress={settings.ServerAddress}
         defaultValues={{
+          GitHubOAuthEnabled: settings.GitHubOAuthEnabled,
+          GitHubClientId: settings.GitHubClientId,
+          GitHubClientSecret: settings.GitHubClientSecret,
+          'discord.enabled': settings['discord.enabled'],
+          'discord.client_id': settings['discord.client_id'],
+          'discord.client_secret': settings['discord.client_secret'],
           'oidc.enabled': settings['oidc.enabled'],
           'oidc.display_name': settings['oidc.display_name'],
           'oidc.client_id': settings['oidc.client_id'],
@@ -58,6 +64,17 @@ const AUTH_SECTIONS = [
             settings['oidc.authorization_endpoint'],
           'oidc.token_endpoint': settings['oidc.token_endpoint'],
           'oidc.user_info_endpoint': settings['oidc.user_info_endpoint'],
+          TelegramOAuthEnabled: settings.TelegramOAuthEnabled,
+          TelegramBotToken: settings.TelegramBotToken,
+          TelegramBotName: settings.TelegramBotName,
+          LinuxDOOAuthEnabled: settings.LinuxDOOAuthEnabled,
+          LinuxDOClientId: settings.LinuxDOClientId,
+          LinuxDOClientSecret: settings.LinuxDOClientSecret,
+          LinuxDOMinimumTrustLevel: settings.LinuxDOMinimumTrustLevel,
+          WeChatAuthEnabled: settings.WeChatAuthEnabled,
+          WeChatServerAddress: settings.WeChatServerAddress,
+          WeChatServerToken: settings.WeChatServerToken,
+          WeChatAccountQRCodeImageURL: settings.WeChatAccountQRCodeImageURL,
         }}
       />
     ),

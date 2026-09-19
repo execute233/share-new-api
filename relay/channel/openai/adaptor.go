@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,13 +15,21 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel"
+	"github.com/QuantumNous/new-api/relay/channel/ai360"
+	"github.com/QuantumNous/new-api/relay/channel/lingyiwanwu"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 
+	//"github.com/QuantumNous/new-api/relay/channel/minimax"
+	"github.com/QuantumNous/new-api/relay/channel/openrouter"
+	"github.com/QuantumNous/new-api/relay/channel/xinference"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relay/common_handler"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/samber/lo"
 
@@ -94,7 +103,69 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
+	if info.RelayMode == relayconstant.RelayModeRealtime {
+		if strings.HasPrefix(info.ChannelBaseUrl, "https://") {
+			baseUrl := strings.TrimPrefix(info.ChannelBaseUrl, "https://")
+			baseUrl = "wss://" + baseUrl
+			info.ChannelBaseUrl = baseUrl
+		} else if strings.HasPrefix(info.ChannelBaseUrl, "http://") {
+			baseUrl := strings.TrimPrefix(info.ChannelBaseUrl, "http://")
+			baseUrl = "ws://" + baseUrl
+			info.ChannelBaseUrl = baseUrl
+		}
+	}
 	switch info.ChannelType {
+	case constant.ChannelTypeAzure:
+		apiVersion := info.ApiVersion
+		if apiVersion == "" {
+			apiVersion = constant.AzureDefaultAPIVersion
+		}
+		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
+		requestURL := strings.Split(info.RequestURLPath, "?")[0]
+		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, apiVersion)
+		task := strings.TrimPrefix(requestURL, "/v1/")
+
+		if info.RelayFormat == types.RelayFormatClaude {
+			task = strings.TrimPrefix(task, "messages")
+			task = "chat/completions" + task
+		}
+
+		// 特殊处理 responses API（包含 compact）
+		if info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact {
+			responsesApiVersion := "preview"
+
+			subUrl := "/openai/v1/responses"
+			if strings.Contains(info.ChannelBaseUrl, "cognitiveservices.azure.com") {
+				subUrl = "/openai/responses"
+				responsesApiVersion = apiVersion
+			}
+
+			if info.ChannelOtherSettings.AzureResponsesVersion != "" {
+				responsesApiVersion = info.ChannelOtherSettings.AzureResponsesVersion
+			}
+
+			// compact 模式追加 /compact
+			if info.RelayMode == relayconstant.RelayModeResponsesCompact {
+				subUrl = subUrl + "/compact"
+			}
+
+			requestURL = fmt.Sprintf("%s?api-version=%s", subUrl, responsesApiVersion)
+			return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
+		}
+
+		model_ := info.UpstreamModelName
+		// 2025年5月10日后创建的渠道不移除.
+		if info.ChannelCreateTime < constant.AzureNoRemoveDotTime {
+			model_ = strings.Replace(model_, ".", "", -1)
+		}
+		// https://github.com/songquanpeng/one-api/issues/67
+		requestURL = fmt.Sprintf("/openai/deployments/%s/%s", model_, task)
+		if info.RelayMode == relayconstant.RelayModeRealtime {
+			requestURL = fmt.Sprintf("/openai/realtime?deployment=%s&api-version=%s", model_, apiVersion)
+		}
+		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, requestURL, info.ChannelType), nil
+	//case constant.ChannelTypeMiniMax:
+	//	return minimax.GetRequestURL(info)
 	case constant.ChannelTypeCustom:
 		url := info.ChannelBaseUrl
 		url = strings.Replace(url, "{model}", info.UpstreamModelName, -1)
@@ -111,6 +182,10 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, header)
+	if info.ChannelType == constant.ChannelTypeAzure {
+		header.Set("api-key", info.ApiKey)
+		return nil
+	}
 	if info.ChannelType == constant.ChannelTypeOpenAI && "" != info.Organization {
 		header.Set("OpenAI-Organization", info.Organization)
 	}
@@ -125,8 +200,43 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 			}
 		}
 	}
-	if !hasAuthOverride {
-		header.Set("Authorization", "Bearer "+info.ApiKey)
+	if info.RelayMode == relayconstant.RelayModeRealtime {
+		// OpenAI 已下线 Realtime Beta API,GA 模型收到 beta 标识会以 beta_api_shape_disabled 拒绝;
+		// 仅对遗留 preview 模型保留 beta 标识
+		legacyRealtimeBeta := strings.Contains(info.UpstreamModelName, "-realtime-preview")
+		swp := c.Request.Header.Get("Sec-WebSocket-Protocol")
+		if swp != "" {
+			items := []string{
+				"realtime",
+				"openai-insecure-api-key." + info.ApiKey,
+			}
+			if legacyRealtimeBeta {
+				items = append(items, "openai-beta.realtime-v1")
+			}
+			header.Set("Sec-WebSocket-Protocol", strings.Join(items, ","))
+			//req.Header.Set("Sec-WebSocket-Key", c.Request.Header.Get("Sec-WebSocket-Key"))
+			//req.Header.Set("Sec-Websocket-Extensions", c.Request.Header.Get("Sec-Websocket-Extensions"))
+			//req.Header.Set("Sec-Websocket-Version", c.Request.Header.Get("Sec-Websocket-Version"))
+		} else {
+			if legacyRealtimeBeta {
+				header.Set("openai-beta", "realtime=v1")
+			}
+			if !hasAuthOverride {
+				header.Set("Authorization", "Bearer "+info.ApiKey)
+			}
+		}
+	} else {
+		if !hasAuthOverride {
+			header.Set("Authorization", "Bearer "+info.ApiKey)
+		}
+	}
+	if info.ChannelType == constant.ChannelTypeOpenRouter {
+		if header.Get("HTTP-Referer") == "" {
+			header.Set("HTTP-Referer", "https://www.newapi.ai")
+		}
+		if header.Get("X-OpenRouter-Title") == "" {
+			header.Set("X-OpenRouter-Title", "New API")
+		}
 	}
 	return nil
 }
@@ -135,8 +245,85 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
-	if info.ChannelType != constant.ChannelTypeOpenAI {
+	if info.ChannelType != constant.ChannelTypeOpenAI && info.ChannelType != constant.ChannelTypeAzure {
 		request.StreamOptions = nil
+	}
+	if info.ChannelType == constant.ChannelTypeOpenRouter {
+		if len(request.Usage) == 0 {
+			request.Usage = json.RawMessage(`{"include":true}`)
+		}
+		// 适配 OpenRouter 的 thinking 后缀
+		if !model_setting.ShouldPreserveThinkingSuffix(info.OriginModelName) &&
+			strings.HasSuffix(info.UpstreamModelName, "-thinking") {
+			info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
+			request.Model = info.UpstreamModelName
+			if len(request.Reasoning) == 0 {
+				reasoning := map[string]any{
+					"enabled": true,
+				}
+				if request.ReasoningEffort != "" && request.ReasoningEffort != "none" {
+					reasoning["effort"] = request.ReasoningEffort
+				}
+				marshal, err := common.Marshal(reasoning)
+				if err != nil {
+					return nil, fmt.Errorf("error marshalling reasoning: %w", err)
+				}
+				request.Reasoning = marshal
+			}
+			// 清空多余的ReasoningEffort
+			request.ReasoningEffort = ""
+		} else {
+			if len(request.Reasoning) == 0 {
+				// 适配 OpenAI 的 ReasoningEffort 格式
+				if request.ReasoningEffort != "" {
+					reasoning := map[string]any{
+						"enabled": true,
+					}
+					if request.ReasoningEffort != "none" {
+						reasoning["effort"] = request.ReasoningEffort
+						marshal, err := common.Marshal(reasoning)
+						if err != nil {
+							return nil, fmt.Errorf("error marshalling reasoning: %w", err)
+						}
+						request.Reasoning = marshal
+					}
+				}
+			}
+			request.ReasoningEffort = ""
+		}
+
+		// https://docs.anthropic.com/en/api/openai-sdk#extended-thinking-support
+		// 没有做排除3.5Haiku等，要出问题再加吧，最佳兼容性（不是
+		if request.THINKING != nil && strings.HasPrefix(info.UpstreamModelName, "anthropic") {
+			var thinking dto.Thinking // Claude标准Thinking格式
+			if err := json.Unmarshal(request.THINKING, &thinking); err != nil {
+				return nil, fmt.Errorf("error Unmarshal thinking: %w", err)
+			}
+
+			// 只有当 thinking.Type 是 "enabled" 时才处理
+			if thinking.Type == "enabled" {
+				// 检查 BudgetTokens 是否为 nil
+				if thinking.BudgetTokens == nil {
+					return nil, fmt.Errorf("BudgetTokens is nil when thinking is enabled")
+				}
+
+				reasoning := openrouter.RequestReasoning{
+					Enabled:   true,
+					MaxTokens: *thinking.BudgetTokens,
+				}
+
+				marshal, err := common.Marshal(reasoning)
+				if err != nil {
+					return nil, fmt.Errorf("error marshalling reasoning: %w", err)
+				}
+
+				request.Reasoning = marshal
+			}
+
+			// 清空 THINKING
+			request.THINKING = nil
+		}
+
 	}
 	isOModel := dto.IsOpenAIReasoningOModel(info.UpstreamModelName)
 	isGPT5Model := dto.IsOpenAIGPT5Model(info.UpstreamModelName)
@@ -179,8 +366,78 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	return request, nil
 }
 
+func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {
+	return request, nil
+}
+
 func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.EmbeddingRequest) (any, error) {
 	return request, nil
+}
+
+func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
+	a.ResponseFormat = request.ResponseFormat
+	if info.RelayMode == relayconstant.RelayModeAudioSpeech {
+		jsonData, err := common.Marshal(request)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling object: %w", err)
+		}
+		return bytes.NewReader(jsonData), nil
+	} else {
+		var requestBody bytes.Buffer
+		writer := multipart.NewWriter(&requestBody)
+
+		writer.WriteField("model", request.Model)
+
+		formData, err2 := common.ParseMultipartFormReusable(c)
+		if err2 != nil {
+			return nil, fmt.Errorf("error parsing multipart form: %w", err2)
+		}
+
+		// 打印类似 curl 命令格式的信息
+		logger.LogDebug(c.Request.Context(), "--form 'model=\"%s\"'", request.Model)
+
+		// 遍历表单字段并打印输出
+		for key, values := range formData.Value {
+			if key == "model" {
+				continue
+			}
+			for _, value := range values {
+				writer.WriteField(key, value)
+				logger.LogDebug(c.Request.Context(), "--form '%s=\"%s\"'", key, value)
+			}
+		}
+
+		// 从 formData 中获取文件
+		fileHeaders := formData.File["file"]
+		if len(fileHeaders) == 0 {
+			return nil, errors.New("file is required")
+		}
+
+		// 使用 formData 中的第一个文件
+		fileHeader := fileHeaders[0]
+		logger.LogDebug(c.Request.Context(), "--form 'file=@\"%s\"' (size: %d bytes, content-type: %s)",
+			fileHeader.Filename, fileHeader.Size, fileHeader.Header.Get("Content-Type"))
+
+		file, err := fileHeader.Open()
+		if err != nil {
+			return nil, fmt.Errorf("error opening audio file: %v", err)
+		}
+		defer file.Close()
+
+		part, err := writer.CreateFormFile("file", fileHeader.Filename)
+		if err != nil {
+			return nil, errors.New("create form file failed")
+		}
+		if _, err := io.Copy(part, file); err != nil {
+			return nil, errors.New("copy file failed")
+		}
+
+		// 关闭 multipart 编写器以设置分界线
+		writer.Close()
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+		logger.LogDebug(c.Request.Context(), "--header 'Content-Type: %s'", writer.FormDataContentType())
+		return &requestBody, nil
+	}
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
@@ -364,8 +621,12 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
-	if info.RelayMode == relayconstant.RelayModeImagesEdits && !isJSONRequest(c) {
+	if info.RelayMode == relayconstant.RelayModeAudioTranscription ||
+		info.RelayMode == relayconstant.RelayModeAudioTranslation ||
+		(info.RelayMode == relayconstant.RelayModeImagesEdits && !isJSONRequest(c)) {
 		return channel.DoFormRequest(a, c, info, requestBody)
+	} else if info.RelayMode == relayconstant.RelayModeRealtime {
+		return channel.DoWssRequest(a, c, info, requestBody)
 	} else {
 		return channel.DoApiRequest(a, c, info, requestBody)
 	}
@@ -373,12 +634,22 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *types.NewAPIError) {
 	switch info.RelayMode {
+	case relayconstant.RelayModeRealtime:
+		err, usage = OpenaiRealtimeHandler(c, info)
+	case relayconstant.RelayModeAudioSpeech:
+		usage = OpenaiTTSHandler(c, resp, info)
+	case relayconstant.RelayModeAudioTranslation:
+		fallthrough
+	case relayconstant.RelayModeAudioTranscription:
+		err, usage = OpenaiSTTHandler(c, resp, info, a.ResponseFormat)
 	case relayconstant.RelayModeImagesGenerations, relayconstant.RelayModeImagesEdits:
 		if info.IsStream {
 			usage, err = OpenaiImageStreamHandler(c, info, resp)
 		} else {
 			usage, err = OpenaiImageHandler(c, info, resp)
 		}
+	case relayconstant.RelayModeRerank:
+		usage, err = common_handler.RerankHandler(c, info, resp)
 	case relayconstant.RelayModeResponses:
 		if info.IsStream {
 			usage, err = OaiResponsesStreamHandler(c, info, resp)
@@ -398,9 +669,35 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 }
 
 func (a *Adaptor) GetModelList() []string {
-	return ModelList
+	switch a.ChannelType {
+	case constant.ChannelType360:
+		return ai360.ModelList
+	case constant.ChannelTypeLingYiWanWu:
+		return lingyiwanwu.ModelList
+	//case constant.ChannelTypeMiniMax:
+	//	return minimax.ModelList
+	case constant.ChannelTypeXinference:
+		return xinference.ModelList
+	case constant.ChannelTypeOpenRouter:
+		return openrouter.ModelList
+	default:
+		return ModelList
+	}
 }
 
 func (a *Adaptor) GetChannelName() string {
-	return ChannelName
+	switch a.ChannelType {
+	case constant.ChannelType360:
+		return ai360.ChannelName
+	case constant.ChannelTypeLingYiWanWu:
+		return lingyiwanwu.ChannelName
+	//case constant.ChannelTypeMiniMax:
+	//	return minimax.ChannelName
+	case constant.ChannelTypeXinference:
+		return xinference.ChannelName
+	case constant.ChannelTypeOpenRouter:
+		return openrouter.ChannelName
+	default:
+		return ChannelName
+	}
 }

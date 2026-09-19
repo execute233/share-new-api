@@ -10,7 +10,6 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relay/channel/codexdisguise"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -26,7 +25,6 @@ func AlphaSearchHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 	case constant.ChannelTypeSub2API,
 		constant.ChannelTypeNewAPI,
 		constant.ChannelTypeCodex,
-		constant.ChannelTypeCodexDisguise,
 		constant.ChannelTypeAdvancedCustom:
 	default:
 		// Allow retry onto another channel that may support this endpoint.
@@ -96,9 +94,6 @@ func AlphaSearchHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError
 
 	if contentType := httpResp.Header.Get("Content-Type"); contentType != "" {
 		c.Writer.Header().Set("Content-Type", contentType)
-	}
-	if info.ChannelType == constant.ChannelTypeCodexDisguise {
-		codexdisguise.RelayUpstreamTurnState(c, info, httpResp.Header)
 	}
 	c.Writer.WriteHeader(httpResp.StatusCode)
 	if _, err := io.Copy(c.Writer, httpResp.Body); err != nil {

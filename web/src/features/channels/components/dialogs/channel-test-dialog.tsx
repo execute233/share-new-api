@@ -191,6 +191,7 @@ const endpointTypeOptions: Array<{ value: string; label: string }> = [
     value: 'gemini',
     label: 'Gemini (/v1beta/models/{model}:generateContent)',
   },
+  { value: 'jina-rerank', label: 'Jina Rerank (/v1/rerank)' },
   {
     value: 'image-generation',
     label: 'Image Generation (/v1/images/generations)',
@@ -205,6 +206,7 @@ const endpointSelectItemClass =
 const STREAM_INCOMPATIBLE_ENDPOINTS = new Set([
   'embeddings',
   'image-generation',
+  'jina-rerank',
   'openai-response-compact',
 ])
 

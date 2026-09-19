@@ -15,6 +15,7 @@ var Version = "v0.0.0"            // this hard coding will be replaced automatic
 var SystemName = "New API"
 var Footer = ""
 var Logo = ""
+var TopUpLink = ""
 
 // var ChatLink = ""
 // var ChatLink2 = ""
@@ -22,6 +23,7 @@ var QuotaPerUnit = 500 * 1000.0 // $0.002 / 1K tokens
 // 保留旧变量以兼容历史逻辑，实际展示由 general_setting.quota_display_type 控制
 var DisplayInCurrencyEnabled = true
 var DisplayTokenStatEnabled = true
+var DrawingEnabled = true
 var TaskEnabled = true
 var DataExportEnabled = true
 var DataExportInterval = 5         // unit: minute
@@ -60,6 +62,10 @@ var MaxRecentItems = 1000
 var PasswordLoginEnabled = true
 var PasswordRegisterEnabled = true
 var EmailVerificationEnabled = false
+var GitHubOAuthEnabled = false
+var LinuxDOOAuthEnabled = false
+var WeChatAuthEnabled = false
+var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
 var RegisterEnabled = true
 
@@ -99,8 +105,21 @@ var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""
 
+var GitHubClientId = ""
+var GitHubClientSecret = ""
+var LinuxDOClientId = ""
+var LinuxDOClientSecret = ""
+var LinuxDOMinimumTrustLevel = 0
+
+var WeChatServerAddress = ""
+var WeChatServerToken = ""
+var WeChatAccountQRCodeImageURL = ""
+
 var TurnstileSiteKey = ""
 var TurnstileSecretKey = ""
+
+var TelegramBotToken = ""
+var TelegramBotName = ""
 
 var QuotaForNewUser = 0
 var QuotaForInviter = 0
@@ -147,6 +166,9 @@ var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int
 
 var GeminiSafetySetting string
+
+// https://docs.cohere.com/docs/safety-modes Type; NONE/CONTEXTUAL/STRICT
+var CohereSafetySetting string
 
 const (
 	RequestIdKey         = "X-Oneapi-Request-Id"
@@ -223,4 +245,11 @@ const (
 	ChannelStatusEnabled          = 1 // don't use 0, 0 is the default value!
 	ChannelStatusManuallyDisabled = 2 // also don't use 0
 	ChannelStatusAutoDisabled     = 3
+)
+
+const (
+	TopUpStatusPending = "pending"
+	TopUpStatusSuccess = "success"
+	TopUpStatusFailed  = "failed"
+	TopUpStatusExpired = "expired"
 )

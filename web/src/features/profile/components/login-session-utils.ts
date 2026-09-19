@@ -53,6 +53,10 @@ export function loginMethodLabel(method: string, t: TFunction): string {
       return t('Two-factor Authentication')
     case 'passkey':
       return t('Passkey')
+    case 'wechat':
+      return t('WeChat')
+    case 'telegram':
+      return t('Telegram')
     case 'oauth':
       return t('OAuth')
     case 'unknown':
@@ -65,6 +69,9 @@ export function loginMethodLabel(method: string, t: TFunction): string {
   if (!normalized.startsWith('oauth:')) return method
   const provider = normalized.slice('oauth:'.length)
   const providerNames: Record<string, string> = {
+    discord: 'Discord',
+    github: 'GitHub',
+    linuxdo: 'LinuxDO',
     oidc: 'OIDC',
   }
   return `${t('OAuth')} · ${providerNames[provider] || provider}`

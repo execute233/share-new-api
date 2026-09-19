@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -120,6 +121,10 @@ func loginMethodFromContext(c *gin.Context) string {
 		return "2fa"
 	case "/api/user/passkey/login/finish":
 		return "passkey"
+	case "/api/oauth/wechat":
+		return "wechat"
+	case "/api/oauth/telegram/login":
+		return "telegram"
 	case "/api/oauth/:provider":
 		if provider := c.Param("provider"); provider != "" {
 			return "oauth:" + provider
@@ -425,6 +430,10 @@ type TransferAffQuotaRequest struct {
 }
 
 func TransferAffQuota(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+
 	id := c.GetInt("id")
 	user, err := model.GetUserById(id, true)
 	if err != nil {
@@ -507,7 +516,11 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 		"role":              user.Role,
 		"status":            user.Status,
 		"email":             user.Email,
+		"github_id":         user.GitHubId,
+		"discord_id":        user.DiscordId,
 		"oidc_id":           user.OidcId,
+		"wechat_id":         user.WeChatId,
+		"telegram_id":       user.TelegramId,
 		"group":             user.Group,
 		"quota":             user.Quota,
 		"used_quota":        user.UsedQuota,
@@ -517,6 +530,7 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 		"aff_quota":         user.AffQuota,
 		"aff_history_quota": user.AffHistoryQuota,
 		"inviter_id":        user.InviterId,
+		"linux_do_id":       user.LinuxDOId,
 		"setting":           user.Setting,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
@@ -565,11 +579,12 @@ func generateDefaultSidebarConfig(userRole int) string {
 
 	// 控制台区域 - 所有用户都可以访问
 	defaultConfig["console"] = map[string]interface{}{
-		"enabled": true,
-		"detail":  true,
-		"token":   true,
-		"log":     true,
-		"task":    true,
+		"enabled":    true,
+		"detail":     true,
+		"token":      true,
+		"log":        true,
+		"midjourney": true,
+		"task":       true,
 	}
 
 	// 个人中心区域 - 所有用户都可以访问
@@ -1338,6 +1353,11 @@ func getTopUpLock(userID int) *topUpTryLock {
 }
 
 func TopUp(c *gin.Context) {
+	if !operation_setting.IsPaymentComplianceConfirmed() {
+		common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
+		return
+	}
+
 	id := c.GetInt("id")
 	lock := getTopUpLock(id)
 	if !lock.TryLock() {

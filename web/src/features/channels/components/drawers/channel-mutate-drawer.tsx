@@ -113,6 +113,7 @@ import {
 } from '@/features/auth/secure-verification'
 import { listActiveProxies } from '@/features/proxies/api'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { useHiddenClickUnlock } from '@/hooks/use-hidden-click-unlock'
 import {
   ADMIN_PERMISSION_ACTIONS,
   ADMIN_PERMISSION_RESOURCES,
@@ -138,7 +139,6 @@ import {
 } from '../../api'
 import {
   ADD_MODE_OPTIONS,
-  CHANNEL_TYPE_CODEX_DISGUISE,
   CLAUDE_FIELD_PASSTHROUGH_TYPES,
   CHANNEL_STATUS_LABELS,
   CHANNEL_TYPE_OPTIONS,
@@ -281,6 +281,10 @@ const SENSITIVE_FORM_FIELDS = [
   'settings',
   'setting',
   'advanced_custom',
+  'is_enterprise_account',
+  'vertex_key_type',
+  'aws_key_type',
+  'azure_responses_version',
   'force_format',
   'thinking_to_content',
   'proxy_id',
@@ -301,6 +305,7 @@ const SENSITIVE_FORM_FIELDS = [
   'fingerprint_seed',
   'codex_client_version',
   'enforce_identity',
+  'disable_task_polling_sleep',
   'upstream_model_update_check_enabled',
   'upstream_model_update_auto_sync_enabled',
   'upstream_model_update_ignored_models',
@@ -349,11 +354,6 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     (values.http2_connection_shards != null &&
       values.http2_connection_shards > 1) ||
     values.claude_beta_query ||
-    values.disguise_enabled === false ||
-    (values.fingerprint_mode && values.fingerprint_mode !== 'session') ||
-    values.fingerprint_seed?.trim() ||
-    values.codex_client_version?.trim() ||
-    values.enforce_identity === false ||
     values.upstream_model_update_check_enabled ||
     values.upstream_model_update_auto_sync_enabled ||
     values.upstream_model_update_ignored_models?.trim()
@@ -736,6 +736,8 @@ export function ChannelMutateDrawer({
   const currentModels = form.watch('models')
   const currentName = form.watch('name')
   const currentModelMapping = form.watch('model_mapping')
+  const awsKeyType = form.watch('aws_key_type')
+  const vertexKeyType = form.watch('vertex_key_type')
   const upstreamModelUpdateCheckEnabled = form.watch(
     'upstream_model_update_check_enabled'
   )
@@ -775,6 +777,9 @@ export function ChannelMutateDrawer({
     }
     return items
   }, [activeProxiesData, currentProxyId, t])
+  const currentDisableTaskPollingSleep = form.watch(
+    'disable_task_polling_sleep'
+  )
   const currentHttpProtocol = form.watch('http_protocol')
   const currentHttp2ConnectionShards = form.watch('http2_connection_shards')
   const currentSystemPrompt = form.watch('system_prompt')
@@ -795,6 +800,23 @@ export function ChannelMutateDrawer({
   const shouldPreviewUnsavedModels =
     !isEditing ||
     (currentType === CHANNEL_TYPE_ADVANCED_CUSTOM && canEditSensitive)
+  const {
+    unlocked: doubaoApiEditUnlocked,
+    handleClick: handleApiConfigSecretClick,
+    reset: resetDoubaoApiUnlock,
+  } = useHiddenClickUnlock({
+    requiredClicks: 10,
+    disabled: currentType !== 45 || sensitiveLocked,
+    onUnlock: () => {
+      toast.info(t('Doubao custom API address editing unlocked'))
+    },
+  })
+
+  useEffect(() => {
+    if (!open) {
+      resetDoubaoApiUnlock()
+    }
+  }, [open, resetDoubaoApiUnlock])
 
   const applyConnectionInfo = useCallback(
     (connectionInfo: ChannelConnectionInfo) => {
@@ -861,7 +883,8 @@ export function ChannelMutateDrawer({
   const isBatchMode =
     multiKeyMode === 'batch' || multiKeyMode === 'multi_to_single'
   const isChannelDetailLoading = isEditing && isChannelLoading
-  const supportsMultiKeyAddMode = currentType !== 57
+  const supportsMultiKeyAddMode =
+    currentType !== 57 && !(currentType === 41 && vertexKeyType === 'api_key')
   const addModeOptions = useMemo(
     () =>
       supportsMultiKeyAddMode
@@ -963,15 +986,18 @@ export function ChannelMutateDrawer({
     formErrors.other ||
     formErrors.multi_key_mode ||
     formErrors.multi_key_type ||
-    formErrors.key_mode
+    formErrors.key_mode ||
+    formErrors.vertex_key_type ||
+    formErrors.aws_key_type ||
+    formErrors.azure_responses_version
   )
   const modelsHaveErrors = Boolean(
     formErrors.models || formErrors.group || formErrors.model_mapping
   )
   const advancedHaveErrors =
     hasAdvancedSettingsErrors(formErrors) || Boolean(formErrors.advanced_custom)
-  const providerRequiresBaseUrl = [8].includes(currentType)
-  const providerRequiresOther: number[] = []
+  const providerRequiresBaseUrl = [3, 8, 45].includes(currentType)
+  const providerRequiresOther = [3, 18].includes(currentType)
   const identityComplete = Boolean(currentName?.trim() && currentType > 0)
   const credentialsComplete = Boolean(
     (isEditing || currentKey?.trim()) &&
@@ -1023,6 +1049,7 @@ export function ChannelMutateDrawer({
     currentThinkingToContent ||
     currentPassThroughBodyEnabled ||
     currentProxyId ||
+    currentDisableTaskPollingSleep ||
     currentSystemPrompt?.trim() ||
     currentSystemPromptOverride ||
     (currentHttpProtocol && currentHttpProtocol !== 'auto') ||
@@ -1271,6 +1298,36 @@ export function ChannelMutateDrawer({
       initialStatusCodeMappingRef.current = ''
     }
   }, [isEditing, channelData, form])
+
+  // Handle type change - set default values for specific types
+  useEffect(() => {
+    if (isEditing) return // Don't auto-set defaults when editing
+
+    // Type 45 (VolcEngine) - set default base_url
+    if (currentType === 45) {
+      const currentBaseUrlValue = form.getValues('base_url')
+      if (!currentBaseUrlValue || currentBaseUrlValue === '') {
+        form.setValue('base_url', 'https://ark.cn-beijing.volces.com')
+      }
+    }
+
+    // Type 18 (Xunfei) - set default other (version)
+    if (currentType === 18) {
+      const currentOther = form.getValues('other')
+      if (!currentOther || currentOther === '') {
+        form.setValue('other', 'v2.1')
+      }
+    }
+  }, [currentType, isEditing, form])
+
+  useEffect(() => {
+    if (currentType !== 45 || currentBaseUrl !== 'doubao-coding-plan') return
+
+    form.setValue('base_url', 'https://ark.cn-beijing.volces.com', {
+      shouldDirty: false,
+      shouldValidate: true,
+    })
+  }, [currentBaseUrl, currentType, form])
 
   useEffect(() => {
     if (isEditing || supportsMultiKeyAddMode) return
@@ -2106,6 +2163,83 @@ export function ChannelMutateDrawer({
                             disabled={sensitiveLocked}
                             className='space-y-4 disabled:opacity-60'
                           >
+                            {/* Azure (type 3) */}
+                            {currentType === 3 && (
+                              <>
+                                <FormField
+                                  control={form.control}
+                                  name='base_url'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('AZURE_OPENAI_ENDPOINT *')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          placeholder={t(
+                                            'e.g., https://docs-test-001.openai.azure.com'
+                                          )}
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t('Your Azure OpenAI endpoint URL')}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='other'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Default API Version *')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          placeholder={t(
+                                            'e.g., 2025-04-01-preview'
+                                          )}
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Default API version for this channel'
+                                        )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name='azure_responses_version'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Responses API Version')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          placeholder={t('e.g., preview')}
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Default Responses API version, if empty, will use the API version above'
+                                        )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </>
+                            )}
+
                             {/* Custom (type 8) */}
                             {currentType === 8 && (
                               <FormField
@@ -2138,8 +2272,1060 @@ export function ChannelMutateDrawer({
                               />
                             )}
 
-                            {/* General base_url for other types */}
-                            {![8].includes(currentType) && (
+                            {/* Xunfei/Spark (type 18) */}
+                            {currentType === 18 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Model Version *')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., v2.1')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Spark model version, e.g., v2.1 (version number in API URL)'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* OpenRouter (type 20) */}
+                            {currentType === 20 && (
+                              <FormField
+                                control={form.control}
+                                name='is_enterprise_account'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Enterprise Account')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'Enable if this is an OpenRouter enterprise account with special response format'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* AWS (type 33) */}
+                            {currentType === 33 && (
+                              <FormField
+                                control={form.control}
+                                name='aws_key_type'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('AWS Key Format')}</FormLabel>
+                                    <Select
+                                      items={[
+                                        {
+                                          value: 'ak_sk',
+                                          label: t(
+                                            'AccessKey / SecretAccessKey'
+                                          ),
+                                        },
+                                        {
+                                          value: 'api_key',
+                                          label: t('API Key'),
+                                        },
+                                      ]}
+                                      onValueChange={field.onChange}
+                                      value={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue
+                                            placeholder={t('Select key format')}
+                                          />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent
+                                        alignItemWithTrigger={false}
+                                      >
+                                        <SelectGroup>
+                                          <SelectItem value='ak_sk'>
+                                            {t('AccessKey / SecretAccessKey')}
+                                          </SelectItem>
+                                          <SelectItem value='api_key'>
+                                            {t('API Key')}
+                                          </SelectItem>
+                                        </SelectGroup>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      {field.value === 'api_key'
+                                        ? t('API Key mode: use APIKey|Region')
+                                        : t(
+                                            'AK/SK mode: use AccessKey|SecretAccessKey|Region'
+                                          )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* AI Proxy Library (type 21) */}
+                            {currentType === 21 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Knowledge Base ID *')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., 123456')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter the knowledge base ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* FastGPT (type 22) */}
+                            {currentType === 22 && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Private Deployment URL')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://fastgpt.run/api/openapi'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'For private deployments, format: https://fastgpt.run/api/openapi'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* SunoAPI (type 36) */}
+                            {currentType === 36 && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t(
+                                        'API Base URL (Important: Not Chat API) *'
+                                      )}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://api.example.com (path before /suno)'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Enter the path before /suno, usually just the domain'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* Cloudflare Workers AI (type 39) */}
+                            {currentType === 39 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('Account ID *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., d6b5da8hk1awo8nap34ube6gh'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Your Cloudflare Account ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* SiliconFlow (type 40) */}
+                            {currentType === 40 && (
+                              <Alert>
+                                <AlertDescription>
+                                  {t('Referral link:')}{' '}
+                                  <a
+                                    href='https://cloud.siliconflow.cn/i/hij0YNTZ'
+                                    target='_blank'
+                                    rel='noopener noreferrer'
+                                    className='text-primary underline'
+                                  >
+                                    {t(
+                                      'https://cloud.siliconflow.cn/i/hij0YNTZ'
+                                    )}
+                                  </a>
+                                </AlertDescription>
+                              </Alert>
+                            )}
+
+                            {/* Vertex AI (type 41) */}
+                            {currentType === 41 && (
+                              <>
+                                <FormField
+                                  control={form.control}
+                                  name='vertex_key_type'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Vertex AI Key Format')}
+                                      </FormLabel>
+                                      <Select
+                                        items={[
+                                          { value: 'json', label: t('JSON') },
+                                          {
+                                            value: 'api_key',
+                                            label: t('API Key'),
+                                          },
+                                        ]}
+                                        onValueChange={field.onChange}
+                                        value={field.value}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent
+                                          alignItemWithTrigger={false}
+                                        >
+                                          <SelectGroup>
+                                            <SelectItem value='json'>
+                                              {t('JSON')}
+                                            </SelectItem>
+                                            <SelectItem value='api_key'>
+                                              {t('API Key')}
+                                            </SelectItem>
+                                          </SelectGroup>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormDescription>
+                                        {field.value === 'json'
+                                          ? t(
+                                              'JSON format supports service account JSON files'
+                                            )
+                                          : t(
+                                              'API Key mode (does not support batch creation)'
+                                            )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                {vertexKeyType === 'json' && (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Service account JSON file(s)')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type='file'
+                                        accept='.json,application/json'
+                                        multiple={isBatchMode}
+                                        onChange={async (e) => {
+                                          const fileList = e.target.files
+                                          const files = fileList
+                                            ? [...fileList]
+                                            : []
+                                          // allow re-selecting the same file
+                                          e.target.value = ''
+
+                                          if (files.length === 0) {
+                                            toast.info(
+                                              t('Please upload key file(s)')
+                                            )
+                                            return
+                                          }
+
+                                          const keys: unknown[] = []
+                                          for (const file of files) {
+                                            try {
+                                              const txt = await file.text()
+                                              keys.push(JSON.parse(txt))
+                                            } catch {
+                                              toast.error(
+                                                t(
+                                                  'Failed to parse JSON file: {{name}}',
+                                                  {
+                                                    name: file.name,
+                                                  }
+                                                )
+                                              )
+                                              return
+                                            }
+                                          }
+
+                                          if (keys.length === 0) {
+                                            toast.info(
+                                              t('Please upload key file(s)')
+                                            )
+                                            return
+                                          }
+
+                                          const keyValue = isBatchMode
+                                            ? JSON.stringify(keys)
+                                            : JSON.stringify(keys[0])
+
+                                          form.setValue('key', keyValue, {
+                                            shouldDirty: true,
+                                            shouldValidate: true,
+                                          })
+
+                                          toast.success(
+                                            t(
+                                              'Parsed {{count}} service account file(s)',
+                                              {
+                                                count: keys.length,
+                                              }
+                                            )
+                                          )
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {isBatchMode
+                                        ? t(
+                                            'Upload multiple JSON files in batch modes'
+                                          )
+                                        : t(
+                                            'Upload a single service account JSON file'
+                                          )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                                <FormField
+                                  control={form.control}
+                                  name='other'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Deployment Region *')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Textarea
+                                          placeholder={t(
+                                            'e.g., us-central1 or JSON format for model-specific regions'
+                                          )}
+                                          rows={3}
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Enter deployment region or JSON mapping:'
+                                        )}{' '}
+                                        {'{'}
+                                        {t(
+                                          '"default": "us-central1", "claude-3-5-sonnet-20240620": "europe-west1"'
+                                        )}
+                                        {'}'}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </>
+                            )}
+
+                            {/* VolcEngine (type 45) */}
+                            {currentType === 45 && !doubaoApiEditUnlocked && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel
+                                      className='cursor-pointer select-none'
+                                      onClick={handleApiConfigSecretClick}
+                                    >
+                                      {t('API Base URL *')}
+                                    </FormLabel>
+                                    <Select
+                                      items={[
+                                        {
+                                          value:
+                                            'https://ark.cn-beijing.volces.com',
+                                          label: t(
+                                            'https://ark.cn-beijing.volces.com'
+                                          ),
+                                        },
+                                        {
+                                          value:
+                                            'https://ark.ap-southeast.bytepluses.com',
+                                          label: t(
+                                            'https://ark.ap-southeast.bytepluses.com'
+                                          ),
+                                        },
+                                      ]}
+                                      onValueChange={field.onChange}
+                                      value={
+                                        field.value === 'doubao-coding-plan'
+                                          ? 'https://ark.cn-beijing.volces.com'
+                                          : field.value ||
+                                            'https://ark.cn-beijing.volces.com'
+                                      }
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent
+                                        alignItemWithTrigger={false}
+                                      >
+                                        <SelectGroup>
+                                          <SelectItem value='https://ark.cn-beijing.volces.com'>
+                                            {t(
+                                              'https://ark.cn-beijing.volces.com'
+                                            )}
+                                          </SelectItem>
+                                          <SelectItem value='https://ark.ap-southeast.bytepluses.com'>
+                                            {t(
+                                              'https://ark.ap-southeast.bytepluses.com'
+                                            )}
+                                          </SelectItem>
+                                        </SelectGroup>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      {t('Select the API endpoint region')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* VolcEngine (type 45) - Custom API URL (unlocked) */}
+                            {currentType === 45 && doubaoApiEditUnlocked && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('API Base URL *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://ark.cn-beijing.volces.com'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter custom API endpoint URL')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* Coze (type 49) */}
+                            {currentType === 49 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('Agent ID *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., 7342866812345')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter the Coze agent ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {currentType === 18 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Model Version *')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., v2.1')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Spark model version, e.g., v2.1 (version number in API URL)'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* OpenRouter (type 20) */}
+                            {currentType === 20 && (
+                              <FormField
+                                control={form.control}
+                                name='is_enterprise_account'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Enterprise Account')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'Enable if this is an OpenRouter enterprise account with special response format'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* AWS (type 33) */}
+                            {currentType === 33 && (
+                              <FormField
+                                control={form.control}
+                                name='aws_key_type'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('AWS Key Format')}</FormLabel>
+                                    <Select
+                                      items={[
+                                        {
+                                          value: 'ak_sk',
+                                          label: t(
+                                            'AccessKey / SecretAccessKey'
+                                          ),
+                                        },
+                                        {
+                                          value: 'api_key',
+                                          label: t('API Key'),
+                                        },
+                                      ]}
+                                      onValueChange={field.onChange}
+                                      value={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue
+                                            placeholder={t('Select key format')}
+                                          />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent
+                                        alignItemWithTrigger={false}
+                                      >
+                                        <SelectGroup>
+                                          <SelectItem value='ak_sk'>
+                                            {t('AccessKey / SecretAccessKey')}
+                                          </SelectItem>
+                                          <SelectItem value='api_key'>
+                                            {t('API Key')}
+                                          </SelectItem>
+                                        </SelectGroup>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      {field.value === 'api_key'
+                                        ? t('API Key mode: use APIKey|Region')
+                                        : t(
+                                            'AK/SK mode: use AccessKey|SecretAccessKey|Region'
+                                          )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* AI Proxy Library (type 21) */}
+                            {currentType === 21 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Knowledge Base ID *')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., 123456')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter the knowledge base ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* FastGPT (type 22) */}
+                            {currentType === 22 && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Private Deployment URL')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://fastgpt.run/api/openapi'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'For private deployments, format: https://fastgpt.run/api/openapi'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* SunoAPI (type 36) */}
+                            {currentType === 36 && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t(
+                                        'API Base URL (Important: Not Chat API) *'
+                                      )}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://api.example.com (path before /suno)'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Enter the path before /suno, usually just the domain'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* Cloudflare Workers AI (type 39) */}
+                            {currentType === 39 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('Account ID *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., d6b5da8hk1awo8nap34ube6gh'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Your Cloudflare Account ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* SiliconFlow (type 40) */}
+                            {currentType === 40 && (
+                              <Alert>
+                                <AlertDescription>
+                                  {t('Referral link:')}{' '}
+                                  <a
+                                    href='https://cloud.siliconflow.cn/i/hij0YNTZ'
+                                    target='_blank'
+                                    rel='noopener noreferrer'
+                                    className='text-primary underline'
+                                  >
+                                    {t(
+                                      'https://cloud.siliconflow.cn/i/hij0YNTZ'
+                                    )}
+                                  </a>
+                                </AlertDescription>
+                              </Alert>
+                            )}
+
+                            {/* Vertex AI (type 41) */}
+                            {currentType === 41 && (
+                              <>
+                                <FormField
+                                  control={form.control}
+                                  name='vertex_key_type'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Vertex AI Key Format')}
+                                      </FormLabel>
+                                      <Select
+                                        items={[
+                                          { value: 'json', label: t('JSON') },
+                                          {
+                                            value: 'api_key',
+                                            label: t('API Key'),
+                                          },
+                                        ]}
+                                        onValueChange={field.onChange}
+                                        value={field.value}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent
+                                          alignItemWithTrigger={false}
+                                        >
+                                          <SelectGroup>
+                                            <SelectItem value='json'>
+                                              {t('JSON')}
+                                            </SelectItem>
+                                            <SelectItem value='api_key'>
+                                              {t('API Key')}
+                                            </SelectItem>
+                                          </SelectGroup>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormDescription>
+                                        {field.value === 'json'
+                                          ? t(
+                                              'JSON format supports service account JSON files'
+                                            )
+                                          : t(
+                                              'API Key mode (does not support batch creation)'
+                                            )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                {vertexKeyType === 'json' && (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Service account JSON file(s)')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type='file'
+                                        accept='.json,application/json'
+                                        multiple={isBatchMode}
+                                        onChange={async (e) => {
+                                          const fileList = e.target.files
+                                          const files = fileList
+                                            ? [...fileList]
+                                            : []
+                                          // allow re-selecting the same file
+                                          e.target.value = ''
+
+                                          if (files.length === 0) {
+                                            toast.info(
+                                              t('Please upload key file(s)')
+                                            )
+                                            return
+                                          }
+
+                                          const keys: unknown[] = []
+                                          for (const file of files) {
+                                            try {
+                                              const txt = await file.text()
+                                              keys.push(JSON.parse(txt))
+                                            } catch {
+                                              toast.error(
+                                                t(
+                                                  'Failed to parse JSON file: {{name}}',
+                                                  {
+                                                    name: file.name,
+                                                  }
+                                                )
+                                              )
+                                              return
+                                            }
+                                          }
+
+                                          if (keys.length === 0) {
+                                            toast.info(
+                                              t('Please upload key file(s)')
+                                            )
+                                            return
+                                          }
+
+                                          const keyValue = isBatchMode
+                                            ? JSON.stringify(keys)
+                                            : JSON.stringify(keys[0])
+
+                                          form.setValue('key', keyValue, {
+                                            shouldDirty: true,
+                                            shouldValidate: true,
+                                          })
+
+                                          toast.success(
+                                            t(
+                                              'Parsed {{count}} service account file(s)',
+                                              {
+                                                count: keys.length,
+                                              }
+                                            )
+                                          )
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {isBatchMode
+                                        ? t(
+                                            'Upload multiple JSON files in batch modes'
+                                          )
+                                        : t(
+                                            'Upload a single service account JSON file'
+                                          )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                                <FormField
+                                  control={form.control}
+                                  name='other'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>
+                                        {t('Deployment Region *')}
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Textarea
+                                          placeholder={t(
+                                            'e.g., us-central1 or JSON format for model-specific regions'
+                                          )}
+                                          rows={3}
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Enter deployment region or JSON mapping:'
+                                        )}{' '}
+                                        {'{'}
+                                        {t(
+                                          '"default": "us-central1", "claude-3-5-sonnet-20240620": "europe-west1"'
+                                        )}
+                                        {'}'}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </>
+                            )}
+
+                            {/* VolcEngine (type 45) */}
+                            {currentType === 45 && !doubaoApiEditUnlocked && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel
+                                      className='cursor-pointer select-none'
+                                      onClick={handleApiConfigSecretClick}
+                                    >
+                                      {t('API Base URL *')}
+                                    </FormLabel>
+                                    <Select
+                                      items={[
+                                        {
+                                          value:
+                                            'https://ark.cn-beijing.volces.com',
+                                          label: t(
+                                            'https://ark.cn-beijing.volces.com'
+                                          ),
+                                        },
+                                        {
+                                          value:
+                                            'https://ark.ap-southeast.bytepluses.com',
+                                          label: t(
+                                            'https://ark.ap-southeast.bytepluses.com'
+                                          ),
+                                        },
+                                      ]}
+                                      onValueChange={field.onChange}
+                                      value={
+                                        field.value === 'doubao-coding-plan'
+                                          ? 'https://ark.cn-beijing.volces.com'
+                                          : field.value ||
+                                            'https://ark.cn-beijing.volces.com'
+                                      }
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent
+                                        alignItemWithTrigger={false}
+                                      >
+                                        <SelectGroup>
+                                          <SelectItem value='https://ark.cn-beijing.volces.com'>
+                                            {t(
+                                              'https://ark.cn-beijing.volces.com'
+                                            )}
+                                          </SelectItem>
+                                          <SelectItem value='https://ark.ap-southeast.bytepluses.com'>
+                                            {t(
+                                              'https://ark.ap-southeast.bytepluses.com'
+                                            )}
+                                          </SelectItem>
+                                        </SelectGroup>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                      {t('Select the API endpoint region')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* VolcEngine (type 45) - Custom API URL (unlocked) */}
+                            {currentType === 45 && doubaoApiEditUnlocked && (
+                              <FormField
+                                control={form.control}
+                                name='base_url'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('API Base URL *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t(
+                                          'e.g., https://ark.cn-beijing.volces.com'
+                                        )}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter custom API endpoint URL')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {/* Coze (type 49) */}
+                            {currentType === 49 && (
+                              <FormField
+                                control={form.control}
+                                name='other'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('Agent ID *')}</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder={t('e.g., 7342866812345')}
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t('Enter the Coze agent ID')}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            {![3, 8, 45].includes(currentType) && (
                               <FormField
                                 control={form.control}
                                 name='base_url'
@@ -2294,6 +3480,32 @@ export function ChannelMutateDrawer({
                                   if (isEditing) {
                                     keyPlaceholder = t(
                                       'Leave empty to keep existing key'
+                                    )
+                                  } else if (
+                                    currentType === 33 &&
+                                    awsKeyType === 'api_key' &&
+                                    isBatchMode
+                                  ) {
+                                    keyPlaceholder = t(
+                                      'Enter API Key, one per line, format: APIKey|Region'
+                                    )
+                                  } else if (
+                                    currentType === 33 &&
+                                    awsKeyType === 'api_key'
+                                  ) {
+                                    keyPlaceholder = t(
+                                      'Enter API Key, format: APIKey|Region'
+                                    )
+                                  } else if (
+                                    currentType === 33 &&
+                                    isBatchMode
+                                  ) {
+                                    keyPlaceholder = t(
+                                      'Enter key, one per line, format: AccessKey|SecretAccessKey|Region'
+                                    )
+                                  } else if (currentType === 33) {
+                                    keyPlaceholder = t(
+                                      'Enter key, format: AccessKey|SecretAccessKey|Region'
                                     )
                                   } else if (isBatchMode) {
                                     keyPlaceholder = t(
@@ -3489,181 +4701,32 @@ export function ChannelMutateDrawer({
                                   </FormItem>
                                 )}
                               />
-                            </div>
 
-                            {currentType === CHANNEL_TYPE_CODEX_DISGUISE && (
-                              <fieldset className='divide-border space-y-0 divide-y border-y'>
-                                <FormField
-                                  control={form.control}
-                                  name='disguise_enabled'
-                                  render={({ field }) => (
-                                    <FormItem className='flex items-center justify-between px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Disguise Enabled')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t(
-                                            'Disable to pass through without disguise'
-                                          )}
-                                        </FormDescription>
-                                      </div>
-                                      <FormControl>
-                                        <Switch
-                                          checked={field.value}
-                                          onCheckedChange={field.onChange}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='fingerprint_mode'
-                                  render={({ field }) => (
-                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Fingerprint Mode')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t('Disguise Settings')}
-                                        </FormDescription>
-                                      </div>
-                                      <Select
-                                        items={[
-                                          { value: 'off', label: t('Off') },
-                                          {
-                                            value: 'device',
-                                            label: t('Device'),
-                                          },
-                                          {
-                                            value: 'session',
-                                            label: t('Session'),
-                                          },
-                                          { value: 'full', label: t('Full') },
-                                        ]}
-                                        value={field.value}
-                                        onValueChange={(value) => {
-                                          field.onChange(value)
-                                        }}
-                                      >
-                                        <FormControl>
-                                          <SelectTrigger className='w-40'>
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent alignItemWithTrigger={false}>
-                                          <SelectGroup>
-                                            {[
-                                              {
-                                                value: 'off',
-                                                label: t('Off'),
-                                              },
-                                              {
-                                                value: 'device',
-                                                label: t('Device'),
-                                              },
-                                              {
-                                                value: 'session',
-                                                label: t('Session'),
-                                              },
-                                              {
-                                                value: 'full',
-                                                label: t('Full'),
-                                              },
-                                            ].map((item) => (
-                                              <SelectItem
-                                                key={item.value}
-                                                value={item.value}
-                                              >
-                                                {item.label}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectGroup>
-                                        </SelectContent>
-                                      </Select>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='fingerprint_seed'
-                                  render={({ field }) => (
-                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Fingerprint Seed')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t(
-                                            'Empty disables fingerprint convergence'
-                                          )}
-                                        </FormDescription>
-                                      </div>
-                                      <FormControl>
-                                        <Input
-                                          className='h-8 w-56'
-                                          placeholder='00000000-0000-4000-8000-000000000000'
-                                          value={field.value}
-                                          onChange={(event) =>
-                                            field.onChange(event.target.value)
-                                          }
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='codex_client_version'
-                                  render={({ field }) => (
-                                    <FormItem className='flex items-center justify-between gap-4 px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Codex Client Version')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t('Disguise Settings')}
-                                        </FormDescription>
-                                      </div>
-                                      <FormControl>
-                                        <Input
-                                          className='h-8 w-40'
-                                          placeholder='0.146.0'
-                                          value={field.value}
-                                          onChange={(event) =>
-                                            field.onChange(event.target.value)
-                                          }
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name='enforce_identity'
-                                  render={({ field }) => (
-                                    <FormItem className='flex items-center justify-between px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Enforce Identity')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t('Disguise Settings')}
-                                        </FormDescription>
-                                      </div>
-                                      <FormControl>
-                                        <Switch
-                                          checked={field.value}
-                                          onCheckedChange={field.onChange}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </fieldset>
-                            )}
+                              <FormField
+                                control={form.control}
+                                name='disable_task_polling_sleep'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between px-4 py-3'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Skip async task polling delay')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'Do not wait one second between polling async tasks for this channel'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
 
                             <FormField
                               control={form.control}

@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Mail,
   Globe,
+  MessageCircle,
+  Send,
   Link2,
   Unlink,
   Loader2,
@@ -27,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SiGithub, SiDiscord } from 'react-icons/si'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -71,7 +74,12 @@ interface BindingItem {
 }
 
 interface StatusInfo {
+  github_oauth?: boolean
+  discord_oauth?: boolean
   oidc_enabled?: boolean
+  wechat_login?: boolean
+  telegram_oauth?: boolean
+  linuxdo_oauth?: boolean
   custom_oauth_providers?: Array<{
     id: number
     name: string
@@ -94,11 +102,46 @@ const BUILTIN_BINDINGS: ReadonlyArray<{
     statusKey: null,
   },
   {
+    key: 'github_id',
+    field: 'github_id',
+    label: 'GitHub',
+    icon: <SiGithub className='h-4 w-4' />,
+    statusKey: 'github_oauth',
+  },
+  {
+    key: 'discord_id',
+    field: 'discord_id',
+    label: 'Discord',
+    icon: <SiDiscord className='h-4 w-4' />,
+    statusKey: 'discord_oauth',
+  },
+  {
+    key: 'wechat_id',
+    field: 'wechat_id',
+    label: 'WeChat',
+    icon: <MessageCircle className='h-4 w-4' />,
+    statusKey: 'wechat_login',
+  },
+  {
     key: 'oidc_id',
     field: 'oidc_id',
     label: 'OIDC',
     icon: <Globe className='h-4 w-4' />,
     statusKey: 'oidc_enabled',
+  },
+  {
+    key: 'telegram_id',
+    field: 'telegram_id',
+    label: 'Telegram',
+    icon: <Send className='h-4 w-4' />,
+    statusKey: 'telegram_oauth',
+  },
+  {
+    key: 'linux_do_id',
+    field: 'linux_do_id',
+    label: 'LinuxDO',
+    icon: <Globe className='h-4 w-4' />,
+    statusKey: 'linuxdo_oauth',
   },
 ]
 

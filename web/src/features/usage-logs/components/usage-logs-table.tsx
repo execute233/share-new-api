@@ -41,6 +41,7 @@ import { parseLogOther } from '../lib/format'
 import { fetchLogsByCategory } from '../lib/utils'
 import type { LogCategory } from '../types'
 import { CommonLogsFilterBar } from './common-logs-filter-bar'
+import { TaskLogsFilterBar } from './task-logs-filter-bar'
 import { UsageLogsMobileList } from './usage-logs-mobile-card'
 import { useLogsViewScope } from './usage-logs-provider'
 
@@ -197,7 +198,13 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
           logCategory={logCategory}
         />
       }
-toolbar={isCommon && <CommonLogsFilterBar table={table} />}
+      toolbar={
+        isCommon ? (
+          <CommonLogsFilterBar table={table} />
+        ) : (
+          <TaskLogsFilterBar table={table} logCategory={logCategory} />
+        )
+      }
       renderRow={(row) => {
         const logType = (row.original as Record<string, unknown>).type as
           | number

@@ -112,7 +112,13 @@ const (
 	MsgUserDefaultTokenFailed        = "user.default_token_failed"
 	MsgUserAffCodeEmpty              = "user.aff_code_empty"
 	MsgUserEmailEmpty                = "user.email_empty"
+	MsgUserGitHubIdEmpty             = "user.github_id_empty"
+	MsgUserDiscordIdEmpty            = "user.discord_id_empty"
 	MsgUserOidcIdEmpty               = "user.oidc_id_empty"
+	MsgUserWeChatIdEmpty             = "user.wechat_id_empty"
+	MsgUserTelegramIdEmpty           = "user.telegram_id_empty"
+	MsgUserTelegramNotBound          = "user.telegram_not_bound"
+	MsgUserLinuxDOIdEmpty            = "user.linux_do_id_empty"
 	MsgUserQuotaChangeZero           = "user.quota_change_zero"
 )
 
@@ -140,6 +146,30 @@ const (
 	MsgSubscriptionInvalidUserId    = "subscription.invalid_user_id"
 )
 
+// Payment related messages
+const (
+	MsgPaymentNotConfigured      = "payment.not_configured"
+	MsgPaymentMethodNotExists    = "payment.method_not_exists"
+	MsgPaymentCallbackError      = "payment.callback_error"
+	MsgPaymentCreateFailed       = "payment.create_failed"
+	MsgPaymentStartFailed        = "payment.start_failed"
+	MsgPaymentAmountTooLow       = "payment.amount_too_low"
+	MsgPaymentStripeNotConfig    = "payment.stripe_not_configured"
+	MsgPaymentWebhookNotConfig   = "payment.webhook_not_configured"
+	MsgPaymentPriceIdNotConfig   = "payment.price_id_not_configured"
+	MsgPaymentCreemNotConfig     = "payment.creem_not_configured"
+	MsgPaymentComplianceRequired = "payment.compliance_required"
+)
+
+// Topup related messages
+const (
+	MsgTopupNotProvided    = "topup.not_provided"
+	MsgTopupOrderNotExists = "topup.order_not_exists"
+	MsgTopupOrderStatus    = "topup.order_status"
+	MsgTopupFailed         = "topup.failed"
+	MsgTopupInvalidQuota   = "topup.invalid_quota"
+)
+
 // Channel related messages
 const (
 	MsgChannelNotExists          = "channel.not_exists"
@@ -148,6 +178,7 @@ const (
 	MsgChannelGetListFailed      = "channel.get_list_failed"
 	MsgChannelGetTagsFailed      = "channel.get_tags_failed"
 	MsgChannelGetKeyFailed       = "channel.get_key_failed"
+	MsgChannelGetOllamaFailed    = "channel.get_ollama_failed"
 	MsgChannelQueryFailed        = "channel.query_failed"
 	MsgChannelNoValidUpstream    = "channel.no_valid_upstream"
 	MsgChannelUpstreamSaturated  = "channel.upstream_saturated"
@@ -267,6 +298,7 @@ const (
 	MsgOAuthConnectFailed   = "oauth.connect_failed"
 	MsgOAuthTokenFailed     = "oauth.token_failed"
 	MsgOAuthUserInfoEmpty   = "oauth.user_info_empty"
+	MsgOAuthTrustLevelLow   = "oauth.trust_level_low"
 )
 
 // Model layer error messages (for translation in controller)
@@ -290,6 +322,7 @@ const (
 	MsgDistributorGroupAccessDenied       = "distributor.group_access_denied"
 	MsgDistributorGetChannelFailed        = "distributor.get_channel_failed"
 	MsgDistributorNoAvailableChannel      = "distributor.no_available_channel"
+	MsgDistributorInvalidMidjourney       = "distributor.invalid_midjourney_request"
 	MsgDistributorInvalidParseModel       = "distributor.invalid_request_parse_model"
 )
 

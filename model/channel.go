@@ -182,7 +182,7 @@ func (channel *Channel) GetKeys() []string {
 		return channel.Keys
 	}
 	trimmed := strings.TrimSpace(channel.Key)
-	// If the key starts with '[', try to parse it as a JSON array (e.g., for multi-key channels)
+	// If the key starts with '[', try to parse it as a JSON array (e.g., for Vertex AI scenarios)
 	if strings.HasPrefix(trimmed, "[") {
 		var arr []json.RawMessage
 		if err := common.Unmarshal([]byte(trimmed), &arr); err == nil {

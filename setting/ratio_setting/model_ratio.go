@@ -17,6 +17,7 @@ const (
 
 // modelRatio
 // https://platform.openai.com/docs/models/model-endpoint-compatibility
+// https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Blfmc9dlf
 // https://openai.com/pricing
 // TODO: when a new api is enabled, check the pricing here
 // 1 === $0.002 / 1K tokens
@@ -44,6 +45,11 @@ var defaultModelRatio = map[string]float64{
 	"gpt-4o-2024-05-13":                         2.5,  // $5 / 1M tokens
 	"gpt-4o-2024-08-06":                         1.25, // $2.5 / 1M tokens
 	"gpt-4o-2024-11-20":                         1.25, // $2.5 / 1M tokens
+	"gpt-4o-realtime-preview":                   2.5,
+	"gpt-4o-realtime-preview-2024-10-01":        2.5,
+	"gpt-4o-realtime-preview-2024-12-17":        2.5,
+	"gpt-4o-mini-realtime-preview":              0.3,
+	"gpt-4o-mini-realtime-preview-2024-12-17":   0.3,
 	"gpt-4.1":                                   1.0,  // $2 / 1M tokens
 	"gpt-4.1-2025-04-14":                        1.0,  // $2 / 1M tokens
 	"gpt-4.1-mini":                              0.2,  // $0.4 / 1M tokens
@@ -106,6 +112,11 @@ var defaultModelRatio = map[string]float64{
 	"text-curie-001":                            1,
 	"text-davinci-edit-001":                     10,
 	"code-davinci-edit-001":                     10,
+	"whisper-1":                                 15,  // $0.006 / minute -> $0.006 / 150 words -> $0.006 / 200 tokens -> $0.03 / 1k tokens
+	"tts-1":                                     7.5, // 1k characters -> $0.015
+	"tts-1-1106":                                7.5, // 1k characters -> $0.015
+	"tts-1-hd":                                  15,  // 1k characters -> $0.03
+	"tts-1-hd-1106":                             15,  // 1k characters -> $0.03
 	"davinci":                                   10,
 	"curie":                                     10,
 	"text-embedding-3-small":                    0.01,
@@ -145,8 +156,23 @@ var defaultModelRatio = map[string]float64{
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
 	"claude-opus-4-1-20250805":                  7.5,
+	"ERNIE-4.0-8K":                              0.120 * RMB,
+	"ERNIE-3.5-8K":                              0.012 * RMB,
+	"ERNIE-3.5-8K-0205":                         0.024 * RMB,
+	"ERNIE-3.5-8K-1222":                         0.012 * RMB,
+	"ERNIE-Bot-8K":                              0.024 * RMB,
+	"ERNIE-3.5-4K-0205":                         0.012 * RMB,
+	"ERNIE-Speed-8K":                            0.004 * RMB,
+	"ERNIE-Speed-128K":                          0.004 * RMB,
+	"ERNIE-Lite-8K-0922":                        0.008 * RMB,
+	"ERNIE-Lite-8K-0308":                        0.003 * RMB,
+	"ERNIE-Tiny-8K":                             0.001 * RMB,
+	"BLOOMZ-7B":                                 0.004 * RMB,
+	"Embedding-V1":                              0.002 * RMB,
 	"bge-large-zh":                              0.002 * RMB,
 	"bge-large-en":                              0.002 * RMB,
+	"tao-8k":                                    0.002 * RMB,
+	"PaLM-2":                                    1,
 	"gemini-1.5-pro-latest":                     1.25, // $3.5 / 1M tokens
 	"gemini-1.5-flash-latest":                   0.075,
 	"gemini-2.0-flash":                          0.05,
@@ -167,21 +193,133 @@ var defaultModelRatio = map[string]float64{
 	"gemini-robotics-er-1.5-preview":            0.15,
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
+	"chatglm_turbo":                             0.3572,     // ￥0.005 / 1k tokens
+	"chatglm_pro":                               0.7143,     // ￥0.01 / 1k tokens
+	"chatglm_std":                               0.3572,     // ￥0.005 / 1k tokens
+	"chatglm_lite":                              0.1429,     // ￥0.002 / 1k tokens
+	"glm-4":                                     7.143,      // ￥0.1 / 1k tokens
+	"glm-4v":                                    0.05 * RMB, // ￥0.05 / 1k tokens
+	"glm-4-alltools":                            0.1 * RMB,  // ￥0.1 / 1k tokens
+	"glm-3-turbo":                               0.3572,
+	"glm-4-plus":                                0.05 * RMB,
+	"glm-4-0520":                                0.1 * RMB,
+	"glm-4-air":                                 0.001 * RMB,
+	"glm-4-airx":                                0.01 * RMB,
+	"glm-4-long":                                0.001 * RMB,
+	"glm-4-flash":                               0,
+	"glm-4v-plus":                               0.01 * RMB,
+	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
+	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
+	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
+	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v3.5":                            1.2858, // ￥0.018 / 1k tokens
+	"SparkDesk-v4.0":                            1.2858,
+	"hunyuan":                                   7.143, // ¥0.1 / 1k tokens  // https://cloud.tencent.com/document/product/1729/97731#e0e6be58-60c8-469f-bdeb-6c264ce3b4d0
+	// https://platform.lingyiwanwu.com/docs#-计费单元
+	// 已经按照 7.2 来换算美元价格
+	"yi-34b-chat-0205":       0.18,
+	"yi-34b-chat-200k":       0.864,
+	"yi-vl-plus":             0.432,
+	"yi-large":               20.0 / 1000 * RMB,
+	"yi-medium":              2.5 / 1000 * RMB,
+	"yi-vision":              6.0 / 1000 * RMB,
+	"yi-medium-200k":         12.0 / 1000 * RMB,
+	"yi-spark":               1.0 / 1000 * RMB,
+	"yi-large-rag":           25.0 / 1000 * RMB,
+	"yi-large-turbo":         12.0 / 1000 * RMB,
+	"yi-large-preview":       20.0 / 1000 * RMB,
+	"yi-large-rag-preview":   25.0 / 1000 * RMB,
+	"command":                0.5,
+	"command-nightly":        0.5,
+	"command-light":          0.5,
+	"command-light-nightly":  0.5,
+	"command-r":              0.25,
+	"command-r-plus":         1.5,
+	"command-r-08-2024":      0.075,
+	"command-r-plus-08-2024": 1.25,
+	"deepseek-chat":          0.27 / 2,
+	"deepseek-coder":         0.27 / 2,
+	"deepseek-reasoner":      0.55 / 2, // 0.55 / 1k tokens
+	// Perplexity online 模型对搜索额外收费，有需要应自行调整，此处不计入搜索费用
+	"llama-3-sonar-small-32k-chat":   0.2 / 1000 * USD,
+	"llama-3-sonar-small-32k-online": 0.2 / 1000 * USD,
+	"llama-3-sonar-large-32k-chat":   1 / 1000 * USD,
+	"llama-3-sonar-large-32k-online": 1 / 1000 * USD,
+	// grok
+	"grok-3-beta":           1.5,
+	"grok-3-mini-beta":      0.15,
+	"grok-2":                1,
+	"grok-2-vision":         1,
+	"grok-beta":             2.5,
+	"grok-vision-beta":      2.5,
+	"grok-3-fast-beta":      2.5,
+	"grok-3-mini-fast-beta": 0.3,
+	// submodel
+	"NousResearch/Hermes-4-405B-FP8":          0.8,
+	"Qwen/Qwen3-235B-A22B-Thinking-2507":      0.6,
+	"Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8": 0.8,
+	"Qwen/Qwen3-235B-A22B-Instruct-2507":      0.3,
+	"zai-org/GLM-4.5-FP8":                     0.8,
+	"openai/gpt-oss-120b":                     0.5,
+	"deepseek-ai/DeepSeek-R1-0528":            0.8,
+	"deepseek-ai/DeepSeek-R1":                 0.8,
+	"deepseek-ai/DeepSeek-V3-0324":            0.8,
+	"deepseek-ai/DeepSeek-V3.1":               0.8,
 }
 
 var defaultModelPrice = map[string]float64{
+	"suno_music":                     0.1,
+	"suno_lyrics":                    0.01,
 	"dall-e-3":                       0.04,
 	"imagen-3.0-generate-002":        0.03,
 	"black-forest-labs/flux-1.1-pro": 0.04,
 	"gpt-4-gizmo-*":                  0.1,
+	"mj_video":                       0.8,
+	"mj_imagine":                     0.1,
+	"mj_edits":                       0.1,
+	"mj_variation":                   0.1,
+	"mj_reroll":                      0.1,
+	"mj_blend":                       0.1,
+	"mj_modal":                       0.1,
+	"mj_zoom":                        0.1,
+	"mj_shorten":                     0.1,
+	"mj_high_variation":              0.1,
+	"mj_low_variation":               0.1,
+	"mj_pan":                         0.1,
+	"mj_inpaint":                     0,
+	"mj_custom_zoom":                 0,
+	"mj_describe":                    0.05,
+	"mj_upscale":                     0.05,
+	"swap_face":                      0.05,
+	"mj_upload":                      0.05,
+	"sora-2":                         0.3,
+	"sora-2-pro":                     0.5,
+	"gpt-4o-mini-tts":                0.3,
+	"veo-3.0-generate-001":           0.4,
+	"veo-3.0-fast-generate-001":      0.15,
+	"veo-3.1-generate-preview":       0.4,
+	"veo-3.1-fast-generate-preview":  0.15,
 }
 
 var defaultAudioRatio = map[string]float64{
-	"gpt-4o-audio-preview":      16,
-	"gpt-4o-mini-audio-preview": 66.67,
+	"gpt-4o-audio-preview":         16,
+	"gpt-4o-mini-audio-preview":    66.67,
+	"gpt-4o-realtime-preview":      8,
+	"gpt-4o-mini-realtime-preview": 16.67,
+	"gpt-4o-mini-tts":              25,
 }
 
-var defaultAudioCompletionRatio = map[string]float64{}
+var defaultAudioCompletionRatio = map[string]float64{
+	"gpt-4o-realtime":      2,
+	"gpt-4o-mini-realtime": 2,
+	"gpt-4o-mini-tts":      1,
+	"tts-1":                0,
+	"tts-1-hd":             0,
+	"tts-1-1106":           0,
+	"tts-1-hd-1106":        0,
+}
 
 var modelPriceMap = types.NewRWMap[string, float64]()
 var modelRatioMap = types.NewRWMap[string, float64]()
@@ -346,6 +484,9 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			if name == "gpt-4o-2024-05-13" {
 				return 3, true
 			}
+			if strings.HasPrefix(name, "gpt-4o-mini-tts") {
+				return 20, false
+			}
 			return 4, false
 		}
 		// gpt-5 匹配
@@ -396,6 +537,9 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		}
 		return 4.0 / 3.0, true
 	}
+	if strings.HasPrefix(name, "mistral-") {
+		return 3, true
+	}
 	if strings.HasPrefix(name, "gemini-") {
 		if strings.HasPrefix(name, "gemini-1.5") {
 			return 4, true
@@ -423,6 +567,20 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			return 6, false
 		}
 		return 4, false
+	}
+	if strings.HasPrefix(name, "command") {
+		switch name {
+		case "command-r":
+			return 3, true
+		case "command-r-plus":
+			return 5, true
+		case "command-r-08-2024":
+			return 4, true
+		case "command-r-plus-08-2024":
+			return 4, true
+		default:
+			return 4, false
+		}
 	}
 	// hint 只给官方上4倍率，由于开源模型供应商自行定价，不对其进行补全倍率进行强制对齐
 	if strings.HasPrefix(name, "ERNIE-Speed-") {

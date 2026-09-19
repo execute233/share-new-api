@@ -24,6 +24,7 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getSelf } from '@/lib/api'
 
 import { getAffiliateCode, transferAffiliateQuota } from '../api'
+import { generateAffiliateLink } from '../lib'
 
 // ============================================================================
 // Affiliate Hook
@@ -44,7 +45,8 @@ export function useAffiliate() {
 
       if (response.success && response.data) {
         setAffiliateCode(response.data)
-        setAffiliateLink(response.data)
+        const link = generateAffiliateLink(response.data)
+        setAffiliateLink(link)
       }
     } catch (error) {
       // eslint-disable-next-line no-console

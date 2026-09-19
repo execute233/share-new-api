@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
@@ -27,6 +28,10 @@ var completionRatioMetaOptionKeys = []string{
 	"ImageRatio",
 	"AudioRatio",
 	"AudioCompletionRatio",
+}
+
+func isPaymentComplianceOptionKey(key string) bool {
+	return strings.HasPrefix(key, "payment_setting.compliance_")
 }
 
 func isPositiveOptionValue(value string) bool {
@@ -137,11 +142,47 @@ func UpdateOption(c *gin.Context) {
 		option.Value = fmt.Sprintf("%v", option.Value)
 	}
 	switch option.Key {
+	case "QuotaForInviter", "QuotaForInvitee":
+		if isPositiveOptionValue(option.Value.(string)) && !operation_setting.IsPaymentComplianceConfirmed() {
+			common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
+			return
+		}
+	default:
+		if isPaymentComplianceOptionKey(option.Key) {
+			common.ApiErrorMsg(c, "合规确认字段不允许通过通用设置接口修改")
+			return
+		}
+	}
+	switch option.Key {
+	case "GitHubOAuthEnabled":
+		if option.Value == "true" && common.GitHubClientId == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 GitHub OAuth，请先填入 GitHub Client Id 以及 GitHub Client Secret！",
+			})
+			return
+		}
+	case "discord.enabled":
+		if option.Value == "true" && system_setting.GetDiscordSettings().ClientId == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 Discord OAuth，请先填入 Discord Client Id 以及 Discord Client Secret！",
+			})
+			return
+		}
 	case "oidc.enabled":
 		if option.Value == "true" && system_setting.GetOIDCSettings().ClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "无法启用 OIDC 登录，请先填入 OIDC Client Id 以及 OIDC Client Secret！",
+			})
+			return
+		}
+	case "LinuxDOOAuthEnabled":
+		if option.Value == "true" && common.LinuxDOClientId == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 LinuxDO OAuth，请先填入 LinuxDO Client Id 以及 LinuxDO Client Secret！",
 			})
 			return
 		}
@@ -153,6 +194,14 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "WeChatAuthEnabled":
+		if option.Value == "true" && common.WeChatServerAddress == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用微信登录，请先填入微信登录相关配置信息！",
+			})
+			return
+		}
 	case "TurnstileCheckEnabled":
 		if option.Value == "true" && common.TurnstileSiteKey == "" {
 			c.JSON(http.StatusOK, gin.H{
@@ -160,6 +209,14 @@ func UpdateOption(c *gin.Context) {
 				"message": "无法启用 Turnstile 校验，请先填入 Turnstile 校验相关配置信息！",
 			})
 
+			return
+		}
+	case "TelegramOAuthEnabled":
+		if option.Value == "true" && common.TelegramBotToken == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 Telegram OAuth，请先填入 Telegram Bot Token！",
+			})
 			return
 		}
 	case "theme.frontend":

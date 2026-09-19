@@ -54,10 +54,21 @@ func GetStatus(c *gin.Context) {
 		"version":                     common.Version,
 		"start_time":                  common.StartTime,
 		"email_verification":          common.EmailVerificationEnabled,
+		"github_oauth":                common.GitHubOAuthEnabled,
+		"github_client_id":            common.GitHubClientId,
+		"discord_oauth":               system_setting.GetDiscordSettings().Enabled,
+		"discord_client_id":           system_setting.GetDiscordSettings().ClientId,
+		"linuxdo_oauth":               common.LinuxDOOAuthEnabled,
+		"linuxdo_client_id":           common.LinuxDOClientId,
+		"linuxdo_minimum_trust_level": common.LinuxDOMinimumTrustLevel,
+		"telegram_oauth":              common.TelegramOAuthEnabled,
+		"telegram_bot_name":           common.TelegramBotName,
 		"theme":                       "default",
 		"system_name":                 common.SystemName,
 		"logo":                        common.Logo,
 		"footer_html":                 common.Footer,
+		"wechat_qrcode":               common.WeChatAccountQRCodeImageURL,
+		"wechat_login":                common.WeChatAuthEnabled,
 		"server_address":              system_setting.ServerAddress,
 		"turnstile_check":             common.TurnstileCheckEnabled,
 		"turnstile_site_key":          common.TurnstileSiteKey,
@@ -69,10 +80,12 @@ func GetStatus(c *gin.Context) {
 		"custom_currency_symbol":        operation_setting.GetGeneralSetting().CustomCurrencySymbol,
 		"custom_currency_exchange_rate": operation_setting.GetGeneralSetting().CustomCurrencyExchangeRate,
 		"enable_batch_update":           common.BatchUpdateEnabled,
+		"enable_drawing":                common.DrawingEnabled,
 		"enable_task":                   common.TaskEnabled,
 		"enable_data_export":            common.DataExportEnabled,
 		"data_export_default_time":      common.DataExportDefaultTime,
 		"default_collapse_sidebar":      common.DefaultCollapseSidebar,
+		"mj_notify_enabled":             setting.MjNotifyEnabled,
 		"chats":                         setting.Chats,
 		"demo_site_enabled":             operation_setting.DemoSiteEnabled,
 		"self_use_mode_enabled":         operation_setting.SelfUseModeEnabled,
@@ -81,7 +94,9 @@ func GetStatus(c *gin.Context) {
 		"password_register_enabled":     common.PasswordRegisterEnabled,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
 
-		"usd_exchange_rate": operation_setting.GetGeneralSetting().USDExchangeRate,
+		"usd_exchange_rate": operation_setting.USDExchangeRate,
+		"price":             operation_setting.Price,
+		"stripe_unit_price": setting.StripeUnitPrice,
 
 		// 面板启用开关
 		"api_info_enabled":      cs.ApiInfoEnabled,
@@ -193,6 +208,17 @@ func GetPrivacyPolicy(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    system_setting.GetLegalSettings().PrivacyPolicy,
+	})
+	return
+}
+
+func GetMidjourney(c *gin.Context) {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    common.OptionMap["Midjourney"],
 	})
 	return
 }

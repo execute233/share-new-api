@@ -6,9 +6,12 @@ import (
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 func FlushWriter(c *gin.Context) (err error) {
@@ -134,9 +137,48 @@ func Done(c *gin.Context) {
 	_ = StringData(c, "[DONE]")
 }
 
+func WssString(c *gin.Context, ws *websocket.Conn, str string) error {
+	if ws == nil {
+		logger.LogError(c, "websocket connection is nil")
+		return errors.New("websocket connection is nil")
+	}
+	//common.LogInfo(c, fmt.Sprintf("sending message: %s", str))
+	return ws.WriteMessage(1, []byte(str))
+}
+
+func WssObject(c *gin.Context, ws *websocket.Conn, object interface{}) error {
+	jsonData, err := common.Marshal(object)
+	if err != nil {
+		return fmt.Errorf("error marshalling object: %w", err)
+	}
+	if ws == nil {
+		logger.LogError(c, "websocket connection is nil")
+		return errors.New("websocket connection is nil")
+	}
+	//common.LogInfo(c, fmt.Sprintf("sending message: %s", jsonData))
+	return ws.WriteMessage(1, jsonData)
+}
+
+func WssError(c *gin.Context, ws *websocket.Conn, openaiError types.OpenAIError) {
+	if ws == nil {
+		return
+	}
+	errorObj := &dto.RealtimeEvent{
+		Type:    "error",
+		EventId: GetLocalRealtimeID(c),
+		Error:   &openaiError,
+	}
+	_ = WssObject(c, ws, errorObj)
+}
+
 func GetResponseID(c *gin.Context) string {
 	logID := c.GetString(common.RequestIdKey)
 	return fmt.Sprintf("chatcmpl-%s", logID)
+}
+
+func GetLocalRealtimeID(c *gin.Context) string {
+	logID := c.GetString(common.RequestIdKey)
+	return fmt.Sprintf("evt_%s", logID)
 }
 
 func GenerateStartEmptyResponse(id string, createAt int64, model string, systemFingerprint *string) *dto.ChatCompletionsStreamResponse {

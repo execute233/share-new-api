@@ -1,8 +1,10 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/tidwall/gjson"
 )
 
@@ -36,6 +39,11 @@ const (
 // ClaudeConvertInfo now lives with the converters (convmeta); the alias keeps
 // host code and adaptors compiling unchanged.
 type ClaudeConvertInfo = convmeta.ClaudeConvertInfo
+
+type RerankerInfo struct {
+	Documents       []any
+	ReturnDocuments bool
+}
 
 type BuildInToolInfo struct {
 	ToolName          string
@@ -95,6 +103,13 @@ type RelayInfo struct {
 	RequestHeaders         map[string]string
 	ShouldIncludeUsage     bool
 	DisablePing            bool // 是否禁止向下游发送自定义 Ping
+	ClientWs               *websocket.Conn
+	TargetWs               *websocket.Conn
+	InputAudioFormat       string
+	OutputAudioFormat      string
+	RealtimeTools          []dto.RealTimeTool
+	IsFirstRequest         bool
+	AudioUsage             bool
 	ReasoningEffort        string
 	UserSetting            dto.UserSetting
 	UserEmail              string
@@ -165,6 +180,7 @@ type RelayInfo struct {
 	ThinkingContentInfo
 	TokenCountMeta
 	*ClaudeConvertInfo
+	*RerankerInfo
 	*ResponsesUsageInfo
 	*ChannelMeta
 	*TaskRelayInfo
@@ -192,6 +208,13 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		UpstreamModelName:    common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 		IsModelMapped:        false,
 		SupportStreamOptions: false,
+	}
+
+	if channelType == constant.ChannelTypeAzure {
+		channelMeta.ApiVersion = GetAPIVersion(c)
+	}
+	if channelType == constant.ChannelTypeVertexAi {
+		channelMeta.ApiVersion = c.GetString("region")
 	}
 
 	channelSetting, ok := common.GetContextKeyType[dto.ChannelSettings](c, constant.ContextKeyChannelSetting)
@@ -256,6 +279,12 @@ func (info *RelayInfo) ToString() string {
 	fmt.Fprintf(b, "Timing{ Start: %s, FirstResponse: %s, LatencyMs: %d }, ",
 		info.StartTime.Format(time.RFC3339Nano), info.FirstResponseTime.Format(time.RFC3339Nano), latencyMs)
 
+	// Audio / realtime
+	if info.InputAudioFormat != "" || info.OutputAudioFormat != "" || len(info.RealtimeTools) > 0 || info.AudioUsage {
+		fmt.Fprintf(b, "Realtime{ AudioUsage: %t, InFmt: %q, OutFmt: %q, Tools: %d }, ",
+			info.AudioUsage, info.InputAudioFormat, info.OutputAudioFormat, len(info.RealtimeTools))
+	}
+
 	// Reasoning
 	if info.ReasoningEffort != "" {
 		fmt.Fprintf(b, "ReasoningEffort: %q, ", info.ReasoningEffort)
@@ -299,11 +328,36 @@ func (info *RelayInfo) ToString() string {
 var streamSupportedChannels = map[int]bool{
 	constant.ChannelTypeOpenAI:         true,
 	constant.ChannelTypeAnthropic:      true,
+	constant.ChannelTypeAws:            true,
 	constant.ChannelTypeGemini:         true,
+	constant.ChannelCloudflare:         true,
+	constant.ChannelTypeAzure:          true,
+	constant.ChannelTypeVolcEngine:     true,
+	constant.ChannelTypeOllama:         true,
+	constant.ChannelTypeXai:            true,
+	constant.ChannelTypeDeepSeek:       true,
+	constant.ChannelTypeBaiduV2:        true,
+	constant.ChannelTypeZhipu_v4:       true,
+	constant.ChannelTypeAli:            true,
+	constant.ChannelTypeSubmodel:       true,
 	constant.ChannelTypeCodex:          true,
+	constant.ChannelTypeMoonshot:       true,
+	constant.ChannelTypeMiniMax:        true,
+	constant.ChannelTypeSiliconFlow:    true,
 	constant.ChannelTypeAdvancedCustom: true,
 	constant.ChannelTypeSub2API:        true,
 	constant.ChannelTypeNewAPI:         true,
+	constant.ChannelTypeTencent:        true,
+}
+
+func GenRelayInfoWs(c *gin.Context, ws *websocket.Conn) *RelayInfo {
+	info := genBaseRelayInfo(c, nil)
+	info.RelayFormat = types.RelayFormatOpenAIRealtime
+	info.ClientWs = ws
+	info.InputAudioFormat = "pcm16"
+	info.OutputAudioFormat = "pcm16"
+	info.IsFirstRequest = true
+	return info
 }
 
 func GenRelayInfoClaude(c *gin.Context, request dto.Request) *RelayInfo {
@@ -314,6 +368,23 @@ func GenRelayInfoClaude(c *gin.Context, request dto.Request) *RelayInfo {
 		LastMessagesType: LastMessageTypeNone,
 	}
 	info.IsClaudeBetaQuery = c.Query("beta") == "true"
+	return info
+}
+
+func GenRelayInfoRerank(c *gin.Context, request *dto.RerankRequest) *RelayInfo {
+	info := genBaseRelayInfo(c, request)
+	info.RelayMode = relayconstant.RelayModeRerank
+	info.RelayFormat = types.RelayFormatRerank
+	info.RerankerInfo = &RerankerInfo{
+		Documents:       request.Documents,
+		ReturnDocuments: request.GetReturnDocuments(),
+	}
+	return info
+}
+
+func GenRelayInfoOpenAIAudio(c *gin.Context, request dto.Request) *RelayInfo {
+	info := genBaseRelayInfo(c, request)
+	info.RelayFormat = types.RelayFormatOpenAIAudio
 	return info
 }
 
@@ -507,16 +578,26 @@ func cloneRequestHeaders(c *gin.Context) map[string]string {
 	return headers
 }
 
-func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Request) (*RelayInfo, error) {
+func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Request, ws *websocket.Conn) (*RelayInfo, error) {
 	var info *RelayInfo
 	var err error
 	switch relayFormat {
 	case types.RelayFormatOpenAI:
 		info = GenRelayInfoOpenAI(c, request)
+	case types.RelayFormatOpenAIAudio:
+		info = GenRelayInfoOpenAIAudio(c, request)
 	case types.RelayFormatOpenAIImage:
 		info = GenRelayInfoImage(c, request)
+	case types.RelayFormatOpenAIRealtime:
+		info = GenRelayInfoWs(c, ws)
 	case types.RelayFormatClaude:
 		info = GenRelayInfoClaude(c, request)
+	case types.RelayFormatRerank:
+		if request, ok := request.(*dto.RerankRequest); ok {
+			info = GenRelayInfoRerank(c, request)
+			break
+		}
+		err = errors.New("request is not a RerankRequest")
 	case types.RelayFormatGemini:
 		info = GenRelayInfoGemini(c, request)
 	case types.RelayFormatEmbedding:
@@ -537,6 +618,12 @@ func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Req
 			return GenRelayInfoAlphaSearch(c, request), nil
 		}
 		return nil, errors.New("request is not a AlphaSearchRequest")
+	case types.RelayFormatTask:
+		info = genBaseRelayInfo(c, nil)
+		info.TaskRelayInfo = &TaskRelayInfo{}
+	case types.RelayFormatMjProxy:
+		info = genBaseRelayInfo(c, nil)
+		info.TaskRelayInfo = &TaskRelayInfo{}
 	default:
 		err = errors.New("invalid relay format")
 	}
@@ -745,6 +832,7 @@ func (info *RelayInfo) ConvOptions() *convmeta.Options {
 			SupportsImagine:                       model_setting.IsGeminiModelSupportImagine,
 			SafetySetting:                         model_setting.GetGeminiSafetySetting,
 		},
+		OpenRouterDialect:      info != nil && info.GetChannelType() == constant.ChannelTypeOpenRouter,
 		PreserveThinkingSuffix: model_setting.ShouldPreserveThinkingSuffix,
 	}
 	if info != nil {
@@ -777,6 +865,107 @@ type TaskRelayInfo struct {
 	// a specific channel (e.g., remix on origin task's channel). Stored as any
 	// to avoid an import cycle with model; callers type-assert to *model.Channel.
 	LockedChannel any
+}
+
+type TaskSubmitReq struct {
+	Prompt         string                 `json:"prompt"`
+	Model          string                 `json:"model,omitempty"`
+	Mode           string                 `json:"mode,omitempty"`
+	Image          string                 `json:"image,omitempty"`
+	Images         []string               `json:"images,omitempty"`
+	Size           string                 `json:"size,omitempty"`
+	Duration       int                    `json:"duration,omitempty"`
+	Seconds        string                 `json:"seconds,omitempty"`
+	InputReference string                 `json:"input_reference,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
+
+func (t *TaskSubmitReq) GetPrompt() string {
+	return t.Prompt
+}
+
+func (t *TaskSubmitReq) HasImage() bool {
+	return len(t.Images) > 0
+}
+
+func (t *TaskSubmitReq) UnmarshalJSON(data []byte) error {
+	type Alias TaskSubmitReq
+	aux := &struct {
+		Metadata json.RawMessage `json:"metadata,omitempty"`
+		Duration json.RawMessage `json:"duration,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(t),
+	}
+
+	if err := common.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if len(aux.Duration) > 0 {
+		var durationInt int
+		if err := common.Unmarshal(aux.Duration, &durationInt); err == nil {
+			t.Duration = durationInt
+		} else {
+			var durationStr string
+			if err := common.Unmarshal(aux.Duration, &durationStr); err == nil && durationStr != "" {
+				if v, err := strconv.Atoi(durationStr); err == nil {
+					t.Duration = v
+				}
+			}
+		}
+	}
+
+	if len(aux.Metadata) > 0 {
+		var metadataStr string
+		if err := common.Unmarshal(aux.Metadata, &metadataStr); err == nil && metadataStr != "" {
+			var metadataObj map[string]interface{}
+			if err := common.Unmarshal([]byte(metadataStr), &metadataObj); err == nil {
+				t.Metadata = metadataObj
+				return nil
+			}
+		}
+
+		var metadataObj map[string]interface{}
+		if err := common.Unmarshal(aux.Metadata, &metadataObj); err == nil {
+			t.Metadata = metadataObj
+		}
+	}
+
+	return nil
+}
+func (t *TaskSubmitReq) UnmarshalMetadata(v any) error {
+	metadata := t.Metadata
+	if metadata != nil {
+		metadataBytes, err := common.Marshal(metadata)
+		if err != nil {
+			return fmt.Errorf("marshal metadata failed: %w", err)
+		}
+		err = common.Unmarshal(metadataBytes, v)
+		if err != nil {
+			return fmt.Errorf("unmarshal metadata to target failed: %w", err)
+		}
+	}
+	return nil
+}
+
+type TaskInfo struct {
+	Code             int    `json:"code"`
+	TaskID           string `json:"task_id"`
+	Status           string `json:"status"`
+	Reason           string `json:"reason,omitempty"`
+	Url              string `json:"url,omitempty"`
+	RemoteUrl        string `json:"remote_url,omitempty"`
+	Progress         string `json:"progress,omitempty"`
+	CompletionTokens int    `json:"completion_tokens,omitempty"` // 用于按倍率计费
+	TotalTokens      int    `json:"total_tokens,omitempty"`      // 用于按倍率计费
+}
+
+func FailTaskInfo(reason string) *TaskInfo {
+	return &TaskInfo{
+		Status: "FAILURE",
+		Reason: reason,
+	}
 }
 
 // RemoveDisabledFields 从请求 JSON 数据中移除渠道设置中禁用的字段

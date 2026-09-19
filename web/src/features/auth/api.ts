@@ -22,6 +22,7 @@ import { api, refreshAuthentication, type RefreshOutcome } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getAffiliateCode } from './lib/storage'
+import type { TelegramAuthorization } from './lib/telegram-login'
 import type {
   LoginPayload,
   LoginResponse,
@@ -130,6 +131,12 @@ export async function sendPasswordResetEmail(
 // OAuth
 // ----------------------------------------------------------------------------
 
+// Start GitHub OAuth flow
+export async function githubOAuthStart(clientId: string, state: string) {
+  const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}&scope=user:email`
+  window.open(url)
+}
+
 // Get OAuth state for CSRF protection
 export async function createOAuthFlow(
   provider: string,
@@ -148,6 +155,25 @@ export async function createOAuthFlow(
     }
   }
   throw new Error(res.data?.message || 'Failed to initialize OAuth')
+}
+
+// WeChat login by authorization code
+export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
+  const res = await api.get('/api/oauth/wechat', { params: { code } })
+  return res.data
+}
+
+export async function telegramLogin(
+  authorization: TelegramAuthorization
+): Promise<ApiResponse> {
+  const res = await api.get('/api/oauth/telegram/login', {
+    params: authorization,
+    disableDuplicate: true,
+    skipAuthRefresh: true,
+    skipBusinessError: true,
+    skipErrorHandler: true,
+  })
+  return res.data
 }
 
 // ----------------------------------------------------------------------------

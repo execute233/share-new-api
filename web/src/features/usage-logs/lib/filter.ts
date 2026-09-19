@@ -20,7 +20,13 @@ For commercial licensing, please contact support@quantumnous.com
  * Utility functions for usage logs filters
  */
 import { LOG_CATEGORY_LABELS } from '../constants'
-import type { LogCategory, LogFilters, CommonLogFilters } from '../types'
+import type {
+  LogCategory,
+  LogFilters,
+  CommonLogFilters,
+  DrawingLogFilters,
+  TaskLogFilters,
+} from '../types'
 
 // ============================================================================
 // Filter Building Functions
@@ -52,6 +58,20 @@ export function buildSearchParams(
         ...(commonFilters.upstreamRequestId && {
           upstreamRequestId: commonFilters.upstreamRequestId,
         }),
+      }
+    }
+    case 'drawing': {
+      const drawingFilters = filters as DrawingLogFilters
+      return {
+        ...baseParams,
+        ...(drawingFilters.mjId && { filter: drawingFilters.mjId }),
+      }
+    }
+    case 'task': {
+      const taskFilters = filters as TaskLogFilters
+      return {
+        ...baseParams,
+        ...(taskFilters.taskId && { filter: taskFilters.taskId }),
       }
     }
     default:

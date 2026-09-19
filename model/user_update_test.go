@@ -298,11 +298,11 @@ func TestUpdateUserBindColumnOnlyTouchesTheBindingColumn(t *testing.T) {
 		"group":  "vip",
 	}).Error)
 
-	require.NoError(t, UpdateUserBindColumn(user.Id, "oidc_id", "oidc-12345"))
+	require.NoError(t, UpdateUserBindColumn(user.Id, "github_id", "gh-12345"))
 
 	reloaded, err := GetUserById(user.Id, true)
 	require.NoError(t, err)
-	assert.Equal(t, "oidc-12345", reloaded.OidcId)
+	assert.Equal(t, "gh-12345", reloaded.GitHubId)
 	assert.Equal(t, common.RoleAdminUser, reloaded.Role)
 	assert.Equal(t, common.UserStatusEnabled, reloaded.Status)
 	assert.Equal(t, "vip", reloaded.Group)
@@ -314,11 +314,11 @@ func TestUpdateUserBindColumnPreservesRestrictiveChange(t *testing.T) {
 	user := createUserBindTestUser(t)
 	require.NoError(t, DB.Model(&User{}).Where("id = ?", user.Id).
 		Update("status", common.UserStatusDisabled).Error)
-	require.NoError(t, UpdateUserBindColumn(user.Id, "oidc_id", "oidc-open-id"))
+	require.NoError(t, UpdateUserBindColumn(user.Id, "wechat_id", "wx-open-id"))
 
 	reloaded, err := GetUserById(user.Id, true)
 	require.NoError(t, err)
-	assert.Equal(t, "oidc-open-id", reloaded.OidcId)
+	assert.Equal(t, "wx-open-id", reloaded.WeChatId)
 	assert.Equal(t, common.UserStatusDisabled, reloaded.Status)
 }
 
@@ -326,11 +326,11 @@ func TestUpdateUserBindColumnRejectsNonWhitelistedColumns(t *testing.T) {
 	truncateTables(t)
 
 	user := createUserBindTestUser(t)
-	for _, column := range []string{"role", "status", "group", "quota", "username", "password", "id", "github_id", "wechat_id"} {
+	for _, column := range []string{"role", "status", "group", "quota", "username", "password", "id"} {
 		assert.Error(t, UpdateUserBindColumn(user.Id, column, "1"), "column %s must be rejected", column)
 	}
-	assert.Error(t, UpdateUserBindColumn(user.Id, "oidc_id; DROP TABLE users", "x"))
-	assert.Error(t, UpdateUserBindColumn(0, "oidc_id", "x"))
+	assert.Error(t, UpdateUserBindColumn(user.Id, "github_id; DROP TABLE users", "x"))
+	assert.Error(t, UpdateUserBindColumn(0, "github_id", "x"))
 }
 
 func TestValidateAndFillRejectsPasswordlessUser(t *testing.T) {

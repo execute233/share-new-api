@@ -15,7 +15,7 @@ func TestAuthFlowIsBoundAndConsumedOnce(t *testing.T) {
 
 	token, created, err := CreateAuthFlow(AuthFlowCreate{
 		Purpose:   AuthFlowPurposeOAuth,
-		Provider:  "oidc",
+		Provider:  "github",
 		Intent:    AuthFlowIntentBind,
 		UserId:    42,
 		SessionId: "session-a",
@@ -28,20 +28,20 @@ func TestAuthFlowIsBoundAndConsumedOnce(t *testing.T) {
 
 	_, err = ConsumeAuthFlow(token, AuthFlowMatch{
 		Purpose:   AuthFlowPurposeOAuth,
-		Provider:  "oidc",
+		Provider:  "github",
 		Intent:    AuthFlowIntentBind,
 		UserId:    99,
 		SessionId: "session-a",
 	})
 	assert.ErrorIs(t, err, ErrAuthFlowInvalid)
 
-	peeked, err := GetAuthFlow(token, AuthFlowMatch{Purpose: AuthFlowPurposeOAuth, Provider: "oidc"})
+	peeked, err := GetAuthFlow(token, AuthFlowMatch{Purpose: AuthFlowPurposeOAuth, Provider: "github"})
 	require.NoError(t, err)
 	assert.Nil(t, peeked.ConsumedAt)
 
 	consumed, err := ConsumeAuthFlow(token, AuthFlowMatch{
 		Purpose:   AuthFlowPurposeOAuth,
-		Provider:  "oidc",
+		Provider:  "github",
 		Intent:    AuthFlowIntentBind,
 		UserId:    42,
 		SessionId: "session-a",
@@ -70,10 +70,21 @@ func TestAuthFlowExpiryIsEnforced(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrAuthFlowExpired))
 }
 
+func TestExternalAuthAssertionCanOnlyBeClaimedOnce(t *testing.T) {
+	truncateTables(t)
+	expiresAt := time.Now().Add(time.Minute)
+
+	require.NoError(t, ClaimExternalAuthAssertion(AuthFlowPurposeTelegramAssertion, "signed-assertion", expiresAt))
+	err := ClaimExternalAuthAssertion(AuthFlowPurposeTelegramAssertion, "signed-assertion", expiresAt)
+	assert.ErrorIs(t, err, ErrAuthFlowConsumed)
+
+	require.NoError(t, ClaimExternalAuthAssertion(AuthFlowPurposeTelegramAssertion, "different-assertion", expiresAt))
+}
+
 func TestConsumeAuthFlowWithActionRollsBackTogether(t *testing.T) {
 	truncateTables(t)
 	token, _, err := CreateAuthFlow(AuthFlowCreate{
-		Purpose:   AuthFlowPurposeOAuth,
+		Purpose:   AuthFlowPurposeTelegramBind,
 		UserId:    42,
 		SessionId: "session-a",
 		ExpiresAt: time.Now().Add(time.Minute),
@@ -82,13 +93,17 @@ func TestConsumeAuthFlowWithActionRollsBackTogether(t *testing.T) {
 	actionErr := errors.New("binding failed")
 
 	_, err = ConsumeAuthFlowWithAction(token, AuthFlowMatch{
-		Purpose: AuthFlowPurposeOAuth, UserId: 42, SessionId: "session-a",
+		Purpose: AuthFlowPurposeTelegramBind, UserId: 42, SessionId: "session-a",
 	}, func(tx *gorm.DB, _ *AuthFlow) error {
+		if err := ClaimExternalAuthAssertionWithTx(tx, AuthFlowPurposeTelegramAssertion, "assertion-a", time.Now().Add(time.Minute)); err != nil {
+			return err
+		}
 		return actionErr
 	})
 	assert.ErrorIs(t, err, actionErr)
 
-	flow, err := GetAuthFlow(token, AuthFlowMatch{Purpose: AuthFlowPurposeOAuth})
+	flow, err := GetAuthFlow(token, AuthFlowMatch{Purpose: AuthFlowPurposeTelegramBind})
 	require.NoError(t, err)
 	assert.Nil(t, flow.ConsumedAt)
+	require.NoError(t, ClaimExternalAuthAssertion(AuthFlowPurposeTelegramAssertion, "assertion-a", time.Now().Add(time.Minute)))
 }

@@ -29,6 +29,9 @@ export {
   sendEmailVerification,
   bindEmail,
   createOAuthFlow,
+  githubOAuthStart,
+  wechatLoginByCode,
+  telegramLogin,
 } from './api'
 
 // ============================================================================
@@ -74,7 +77,10 @@ export {
 // ============================================================================
 
 export {
+  buildGitHubOAuthUrl,
+  buildDiscordOAuthUrl,
   buildOIDCOAuthUrl,
+  buildLinuxDOOAuthUrl,
   getAvailableOAuthProviders,
   hasOAuthProviders,
 } from './lib/oauth'

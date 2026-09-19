@@ -39,6 +39,10 @@ func InitOptionMap() {
 	common.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(common.PasswordLoginEnabled)
 	common.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(common.PasswordRegisterEnabled)
 	common.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(common.EmailVerificationEnabled)
+	common.OptionMap["GitHubOAuthEnabled"] = strconv.FormatBool(common.GitHubOAuthEnabled)
+	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
+	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
+	common.OptionMap["WeChatAuthEnabled"] = strconv.FormatBool(common.WeChatAuthEnabled)
 	common.OptionMap["TurnstileCheckEnabled"] = strconv.FormatBool(common.TurnstileCheckEnabled)
 	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
@@ -46,6 +50,7 @@ func InitOptionMap() {
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
+	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
 	common.OptionMap["TaskEnabled"] = strconv.FormatBool(common.TaskEnabled)
 	common.OptionMap["DataExportEnabled"] = strconv.FormatBool(common.DataExportEnabled)
 	common.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(common.ChannelDisableThreshold, 'f', -1, 64)
@@ -71,11 +76,59 @@ func InitOptionMap() {
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
 	common.OptionMap["WorkerValidKey"] = system_setting.WorkerValidKey
 	common.OptionMap["WorkerAllowHttpImageRequestEnabled"] = strconv.FormatBool(system_setting.WorkerAllowHttpImageRequestEnabled)
+	common.OptionMap["PayAddress"] = ""
+	common.OptionMap["CustomCallbackAddress"] = ""
+	common.OptionMap["EpayId"] = ""
+	common.OptionMap["EpayKey"] = ""
+	common.OptionMap["Price"] = strconv.FormatFloat(operation_setting.Price, 'f', -1, 64)
+	common.OptionMap["USDExchangeRate"] = strconv.FormatFloat(operation_setting.USDExchangeRate, 'f', -1, 64)
+	common.OptionMap["MinTopUp"] = strconv.Itoa(operation_setting.MinTopUp)
+	common.OptionMap["StripeMinTopUp"] = strconv.Itoa(setting.StripeMinTopUp)
+	common.OptionMap["StripeApiSecret"] = setting.StripeApiSecret
+	common.OptionMap["StripeWebhookSecret"] = setting.StripeWebhookSecret
+	common.OptionMap["StripePriceId"] = setting.StripePriceId
+	common.OptionMap["StripeUnitPrice"] = strconv.FormatFloat(setting.StripeUnitPrice, 'f', -1, 64)
+	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
+	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
+	common.OptionMap["CreemProducts"] = setting.CreemProducts
+	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
+	common.OptionMap["CreemWebhookSecret"] = setting.CreemWebhookSecret
+	common.OptionMap["WaffoEnabled"] = strconv.FormatBool(setting.WaffoEnabled)
+	common.OptionMap["WaffoApiKey"] = setting.WaffoApiKey
+	common.OptionMap["WaffoPrivateKey"] = setting.WaffoPrivateKey
+	common.OptionMap["WaffoPublicCert"] = setting.WaffoPublicCert
+	common.OptionMap["WaffoSandboxPublicCert"] = setting.WaffoSandboxPublicCert
+	common.OptionMap["WaffoSandboxApiKey"] = setting.WaffoSandboxApiKey
+	common.OptionMap["WaffoSandboxPrivateKey"] = setting.WaffoSandboxPrivateKey
+	common.OptionMap["WaffoSandbox"] = strconv.FormatBool(setting.WaffoSandbox)
+	common.OptionMap["WaffoMerchantId"] = setting.WaffoMerchantId
+	common.OptionMap["WaffoNotifyUrl"] = setting.WaffoNotifyUrl
+	common.OptionMap["WaffoReturnUrl"] = setting.WaffoReturnUrl
+	common.OptionMap["WaffoSubscriptionReturnUrl"] = setting.WaffoSubscriptionReturnUrl
+	common.OptionMap["WaffoCurrency"] = setting.WaffoCurrency
+	common.OptionMap["WaffoUnitPrice"] = strconv.FormatFloat(setting.WaffoUnitPrice, 'f', -1, 64)
+	common.OptionMap["WaffoMinTopUp"] = strconv.Itoa(setting.WaffoMinTopUp)
+	common.OptionMap["WaffoPayMethods"] = setting.WaffoPayMethods2JsonString()
+	common.OptionMap["WaffoPancakeMerchantID"] = setting.WaffoPancakeMerchantID
+	common.OptionMap["WaffoPancakePrivateKey"] = setting.WaffoPancakePrivateKey
+	common.OptionMap["WaffoPancakeReturnURL"] = setting.WaffoPancakeReturnURL
+	common.OptionMap["WaffoPancakeUnitPrice"] = strconv.FormatFloat(setting.WaffoPancakeUnitPrice, 'f', -1, 64)
+	common.OptionMap["WaffoPancakeMinTopUp"] = strconv.Itoa(setting.WaffoPancakeMinTopUp)
+	common.OptionMap["WaffoPancakeStoreID"] = setting.WaffoPancakeStoreID
+	common.OptionMap["WaffoPancakeProductID"] = setting.WaffoPancakeProductID
 	common.OptionMap["TopupGroupRatio"] = common.TopupGroupRatio2JSONString()
 	common.OptionMap["Chats"] = setting.Chats2JsonString()
 	common.OptionMap["AutoGroups"] = setting.AutoGroups2JsonString()
 	common.OptionMap["DefaultUseAutoGroup"] = strconv.FormatBool(setting.DefaultUseAutoGroup)
 	common.OptionMap["MaxTokenAutoGroups"] = strconv.Itoa(setting.GetMaxTokenAutoGroups())
+	common.OptionMap["PayMethods"] = operation_setting.PayMethods2JsonString()
+	common.OptionMap["GitHubClientId"] = ""
+	common.OptionMap["GitHubClientSecret"] = ""
+	common.OptionMap["TelegramBotToken"] = ""
+	common.OptionMap["TelegramBotName"] = ""
+	common.OptionMap["WeChatServerAddress"] = ""
+	common.OptionMap["WeChatServerToken"] = ""
+	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
 	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
@@ -98,6 +151,7 @@ func InitOptionMap() {
 	common.OptionMap["ImageRatio"] = ratio_setting.ImageRatio2JSONString()
 	common.OptionMap["AudioRatio"] = ratio_setting.AudioRatio2JSONString()
 	common.OptionMap["AudioCompletionRatio"] = ratio_setting.AudioCompletionRatio2JSONString()
+	common.OptionMap["TopUpLink"] = common.TopUpLink
 	//common.OptionMap["ChatLink"] = common.ChatLink
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
 	common.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(common.QuotaPerUnit, 'f', -1, 64)
@@ -105,6 +159,11 @@ func InitOptionMap() {
 	common.OptionMap["DataExportInterval"] = strconv.Itoa(common.DataExportInterval)
 	common.OptionMap["DataExportDefaultTime"] = common.DataExportDefaultTime
 	common.OptionMap["DefaultCollapseSidebar"] = strconv.FormatBool(common.DefaultCollapseSidebar)
+	common.OptionMap["MjNotifyEnabled"] = strconv.FormatBool(setting.MjNotifyEnabled)
+	common.OptionMap["MjAccountFilterEnabled"] = strconv.FormatBool(setting.MjAccountFilterEnabled)
+	common.OptionMap["MjModeClearEnabled"] = strconv.FormatBool(setting.MjModeClearEnabled)
+	common.OptionMap["MjForwardUrlEnabled"] = strconv.FormatBool(setting.MjForwardUrlEnabled)
+	common.OptionMap["MjActionCheckSuccessEnabled"] = strconv.FormatBool(setting.MjActionCheckSuccessEnabled)
 	common.OptionMap["CheckSensitiveEnabled"] = strconv.FormatBool(setting.CheckSensitiveEnabled)
 	common.OptionMap["DemoSiteEnabled"] = strconv.FormatBool(operation_setting.DemoSiteEnabled)
 	common.OptionMap["SelfUseModeEnabled"] = strconv.FormatBool(operation_setting.SelfUseModeEnabled)
@@ -252,6 +311,14 @@ func updateOptionMap(key string, value string) (err error) {
 			common.PasswordLoginEnabled = boolValue
 		case "EmailVerificationEnabled":
 			common.EmailVerificationEnabled = boolValue
+		case "GitHubOAuthEnabled":
+			common.GitHubOAuthEnabled = boolValue
+		case "LinuxDOOAuthEnabled":
+			common.LinuxDOOAuthEnabled = boolValue
+		case "WeChatAuthEnabled":
+			common.WeChatAuthEnabled = boolValue
+		case "TelegramOAuthEnabled":
+			common.TelegramOAuthEnabled = boolValue
 		case "TurnstileCheckEnabled":
 			common.TurnstileCheckEnabled = boolValue
 		case "RegisterEnabled":
@@ -278,12 +345,24 @@ func updateOptionMap(key string, value string) (err error) {
 			}
 		case "DisplayTokenStatEnabled":
 			common.DisplayTokenStatEnabled = boolValue
+		case "DrawingEnabled":
+			common.DrawingEnabled = boolValue
 		case "TaskEnabled":
 			common.TaskEnabled = boolValue
 		case "DataExportEnabled":
 			common.DataExportEnabled = boolValue
 		case "DefaultCollapseSidebar":
 			common.DefaultCollapseSidebar = boolValue
+		case "MjNotifyEnabled":
+			setting.MjNotifyEnabled = boolValue
+		case "MjAccountFilterEnabled":
+			setting.MjAccountFilterEnabled = boolValue
+		case "MjModeClearEnabled":
+			setting.MjModeClearEnabled = boolValue
+		case "MjForwardUrlEnabled":
+			setting.MjForwardUrlEnabled = boolValue
+		case "MjActionCheckSuccessEnabled":
+			setting.MjActionCheckSuccessEnabled = boolValue
 		case "CheckSensitiveEnabled":
 			setting.CheckSensitiveEnabled = boolValue
 		case "DemoSiteEnabled":
@@ -332,20 +411,118 @@ func updateOptionMap(key string, value string) (err error) {
 		system_setting.WorkerUrl = value
 	case "WorkerValidKey":
 		system_setting.WorkerValidKey = value
+	case "PayAddress":
+		operation_setting.PayAddress = value
 	case "Chats":
 		err = setting.UpdateChatsByJsonString(value)
 	case "AutoGroups":
 		err = setting.UpdateAutoGroupsByJsonString(value)
 	case "MaxTokenAutoGroups":
 		err = setting.UpdateMaxTokenAutoGroups(value)
+	case "CustomCallbackAddress":
+		operation_setting.CustomCallbackAddress = value
+	case "EpayId":
+		operation_setting.EpayId = value
+	case "EpayKey":
+		operation_setting.EpayKey = value
+	case "Price":
+		operation_setting.Price, _ = strconv.ParseFloat(value, 64)
+	case "USDExchangeRate":
+		operation_setting.USDExchangeRate, _ = strconv.ParseFloat(value, 64)
+	case "MinTopUp":
+		operation_setting.MinTopUp, _ = strconv.Atoi(value)
+	case "StripeApiSecret":
+		setting.StripeApiSecret = value
+	case "StripeWebhookSecret":
+		setting.StripeWebhookSecret = value
+	case "StripePriceId":
+		setting.StripePriceId = value
+	case "StripeUnitPrice":
+		setting.StripeUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "StripeMinTopUp":
+		setting.StripeMinTopUp, _ = strconv.Atoi(value)
+	case "StripePromotionCodesEnabled":
+		setting.StripePromotionCodesEnabled = value == "true"
+	case "CreemApiKey":
+		setting.CreemApiKey = value
+	case "CreemProducts":
+		setting.CreemProducts = value
+	case "CreemTestMode":
+		setting.CreemTestMode = value == "true"
+	case "CreemWebhookSecret":
+		setting.CreemWebhookSecret = value
+	case "WaffoEnabled":
+		setting.WaffoEnabled = value == "true"
+	case "WaffoApiKey":
+		setting.WaffoApiKey = value
+	case "WaffoPrivateKey":
+		setting.WaffoPrivateKey = value
+	case "WaffoPublicCert":
+		setting.WaffoPublicCert = value
+	case "WaffoSandboxPublicCert":
+		setting.WaffoSandboxPublicCert = value
+	case "WaffoSandboxApiKey":
+		setting.WaffoSandboxApiKey = value
+	case "WaffoSandboxPrivateKey":
+		setting.WaffoSandboxPrivateKey = value
+	case "WaffoSandbox":
+		setting.WaffoSandbox = value == "true"
+	case "WaffoMerchantId":
+		setting.WaffoMerchantId = value
+	case "WaffoNotifyUrl":
+		setting.WaffoNotifyUrl = value
+	case "WaffoReturnUrl":
+		setting.WaffoReturnUrl = value
+	case "WaffoSubscriptionReturnUrl":
+		setting.WaffoSubscriptionReturnUrl = value
+	case "WaffoCurrency":
+		setting.WaffoCurrency = value
+	case "WaffoUnitPrice":
+		setting.WaffoUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "WaffoMinTopUp":
+		setting.WaffoMinTopUp, _ = strconv.Atoi(value)
+	case "WaffoPancakeMerchantID":
+		setting.WaffoPancakeMerchantID = value
+	case "WaffoPancakePrivateKey":
+		setting.WaffoPancakePrivateKey = value
+	case "WaffoPancakeReturnURL":
+		setting.WaffoPancakeReturnURL = value
+	case "WaffoPancakeStoreID":
+		setting.WaffoPancakeStoreID = value
+	case "WaffoPancakeProductID":
+		setting.WaffoPancakeProductID = value
+	case "WaffoPancakeUnitPrice":
+		setting.WaffoPancakeUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "WaffoPancakeMinTopUp":
+		setting.WaffoPancakeMinTopUp, _ = strconv.Atoi(value)
 	case "TopupGroupRatio":
 		err = common.UpdateTopupGroupRatioByJSONString(value)
+	case "GitHubClientId":
+		common.GitHubClientId = value
+	case "GitHubClientSecret":
+		common.GitHubClientSecret = value
+	case "LinuxDOClientId":
+		common.LinuxDOClientId = value
+	case "LinuxDOClientSecret":
+		common.LinuxDOClientSecret = value
+	case "LinuxDOMinimumTrustLevel":
+		common.LinuxDOMinimumTrustLevel, _ = strconv.Atoi(value)
 	case "Footer":
 		common.Footer = value
 	case "SystemName":
 		common.SystemName = value
 	case "Logo":
 		common.Logo = value
+	case "WeChatServerAddress":
+		common.WeChatServerAddress = value
+	case "WeChatServerToken":
+		common.WeChatServerToken = value
+	case "WeChatAccountQRCodeImageURL":
+		common.WeChatAccountQRCodeImageURL = value
+	case "TelegramBotToken":
+		common.TelegramBotToken = value
+	case "TelegramBotName":
+		common.TelegramBotName = value
 	case "TurnstileSiteKey":
 		common.TurnstileSiteKey = value
 	case "TurnstileSecretKey":
@@ -396,6 +573,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateAudioRatioByJSONString(value)
 	case "AudioCompletionRatio":
 		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(value)
+	case "TopUpLink":
+		common.TopUpLink = value
 	//case "ChatLink":
 	//	common.ChatLink = value
 	//case "ChatLink2":
@@ -414,6 +593,12 @@ func updateOptionMap(key string, value string) (err error) {
 		err = operation_setting.AutomaticRetryStatusCodesFromString(value)
 	case "StreamCacheQueueLength":
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
+	case "PayMethods":
+		err = operation_setting.UpdatePayMethodsByJsonString(value)
+	case "WaffoPayMethods":
+		// WaffoPayMethods is read directly from OptionMap via setting.GetWaffoPayMethods().
+		// The value is already stored in OptionMap at the top of this function (line: common.OptionMap[key] = value).
+		// No additional in-memory variable to update.
 	}
 	return err
 }

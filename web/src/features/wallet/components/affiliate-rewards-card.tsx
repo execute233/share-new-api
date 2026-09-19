@@ -33,6 +33,7 @@ interface AffiliateRewardsCardProps {
   user: UserWalletData | null
   affiliateLink: string
   onTransfer: () => void
+  complianceConfirmed?: boolean
   loading?: boolean
 }
 
@@ -40,6 +41,7 @@ export function AffiliateRewardsCard({
   user,
   affiliateLink,
   onTransfer,
+  complianceConfirmed = true,
   loading,
 }: AffiliateRewardsCardProps) {
   const { t } = useTranslation()
@@ -113,6 +115,7 @@ export function AffiliateRewardsCard({
           {hasRewards && (
             <Button
               onClick={onTransfer}
+              disabled={!complianceConfirmed}
               className='h-9 shrink-0 px-3'
               size='sm'
             >
@@ -120,6 +123,13 @@ export function AffiliateRewardsCard({
             </Button>
           )}
         </div>
+        {!complianceConfirmed ? (
+          <p className='text-muted-foreground text-xs lg:col-span-3'>
+            {t(
+              'Referral reward transfer is disabled until the administrator confirms compliance terms.'
+            )}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   )

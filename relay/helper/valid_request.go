@@ -45,10 +45,55 @@ func GetAndValidateRequest(c *gin.Context, format types.RelayFormat) (request dt
 		request, err = GetAndValidOpenAIImageRequest(c, relayMode)
 	case types.RelayFormatEmbedding:
 		request, err = GetAndValidateEmbeddingRequest(c, relayMode)
+	case types.RelayFormatRerank:
+		request, err = GetAndValidateRerankRequest(c)
+	case types.RelayFormatOpenAIAudio:
+		request, err = GetAndValidAudioRequest(c, relayMode)
+	case types.RelayFormatOpenAIRealtime:
+		request = &dto.BaseRequest{}
 	default:
 		return nil, fmt.Errorf("unsupported relay format: %s", format)
 	}
 	return request, err
+}
+
+func GetAndValidAudioRequest(c *gin.Context, relayMode int) (*dto.AudioRequest, error) {
+	audioRequest := &dto.AudioRequest{}
+	err := common.UnmarshalBodyReusable(c, audioRequest)
+	if err != nil {
+		return nil, err
+	}
+	switch relayMode {
+	case relayconstant.RelayModeAudioSpeech:
+		if audioRequest.Model == "" {
+			return nil, errors.New("model is required")
+		}
+	default:
+		if audioRequest.Model == "" {
+			return nil, errors.New("model is required")
+		}
+		if audioRequest.ResponseFormat == "" {
+			audioRequest.ResponseFormat = "json"
+		}
+	}
+	return audioRequest, nil
+}
+
+func GetAndValidateRerankRequest(c *gin.Context) (*dto.RerankRequest, error) {
+	var rerankRequest *dto.RerankRequest
+	err := common.UnmarshalBodyReusable(c, &rerankRequest)
+	if err != nil {
+		logger.LogError(c, fmt.Sprintf("getAndValidateTextRequest failed: %s", err.Error()))
+		return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	if rerankRequest.Query == "" {
+		return nil, types.NewError(fmt.Errorf("query is empty"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	if len(rerankRequest.Documents) == 0 {
+		return nil, types.NewError(fmt.Errorf("documents is empty"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	return rerankRequest, nil
 }
 
 func GetAndValidateEmbeddingRequest(c *gin.Context, relayMode int) (*dto.EmbeddingRequest, error) {

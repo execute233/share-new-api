@@ -4,6 +4,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +72,14 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.TokenAuth())
 	relayV1Router.Use(middleware.ModelRequestRateLimit())
 	{
+		// WebSocket 路由（统一到 Relay）
+		wsRouter := relayV1Router.Group("")
+		wsRouter.Use(middleware.Distribute())
+		wsRouter.GET("/realtime", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIRealtime)
+		})
+	}
+	{
 		//http router
 		httpRouter := relayV1Router.Group("")
 		httpRouter.Use(middleware.Distribute())
@@ -117,6 +126,22 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatEmbedding)
 		})
 
+		// audio related routes
+		httpRouter.POST("/audio/transcriptions", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIAudio)
+		})
+		httpRouter.POST("/audio/translations", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIAudio)
+		})
+		httpRouter.POST("/audio/speech", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIAudio)
+		})
+
+		// rerank related routes
+		httpRouter.POST("/rerank", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatRerank)
+		})
+
 		// gemini relay routes
 		httpRouter.POST("/engines/:model/embeddings", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatGemini)
@@ -145,6 +170,27 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.DELETE("/models/:model", controller.RelayNotImplemented)
 	}
 
+	relayMjRouter := router.Group("/mj")
+	relayMjRouter.Use(middleware.RouteTag("relay"))
+	relayMjRouter.Use(middleware.SystemPerformanceCheck())
+	registerMjRouterGroup(relayMjRouter)
+
+	relayMjModeRouter := router.Group("/:mode/mj")
+	relayMjModeRouter.Use(middleware.RouteTag("relay"))
+	relayMjModeRouter.Use(middleware.SystemPerformanceCheck())
+	registerMjRouterGroup(relayMjModeRouter)
+	//relayMjRouter.Use()
+
+	relaySunoRouter := router.Group("/suno")
+	relaySunoRouter.Use(middleware.RouteTag("relay"))
+	relaySunoRouter.Use(middleware.SystemPerformanceCheck())
+	relaySunoRouter.Use(middleware.TokenAuth(), middleware.Distribute())
+	{
+		relaySunoRouter.POST("/submit/:action", controller.RelayTask)
+		relaySunoRouter.POST("/fetch", controller.RelayTaskFetch)
+		relaySunoRouter.GET("/fetch/:id", controller.RelayTaskFetch)
+	}
+
 	relayGeminiRouter := router.Group("/v1beta")
 	relayGeminiRouter.Use(middleware.RouteTag("relay"))
 	relayGeminiRouter.Use(middleware.SystemPerformanceCheck())
@@ -157,27 +203,27 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatGemini)
 		})
 	}
+}
 
-	codexDisguiseRouter := router.Group("/backend-api/codex")
-	codexDisguiseRouter.Use(middleware.RouteTag("relay"))
-	codexDisguiseRouter.Use(middleware.SystemPerformanceCheck())
-	codexDisguiseRouter.Use(middleware.TokenAuth())
-	codexDisguiseRouter.Use(middleware.ModelRequestRateLimit())
+func registerMjRouterGroup(relayMjRouter *gin.RouterGroup) {
+	relayMjRouter.GET("/image/:id", relay.RelayMidjourneyImage)
+	relayMjRouter.Use(middleware.TokenAuth(), middleware.Distribute())
 	{
-		httpRouter := codexDisguiseRouter.Group("")
-		httpRouter.Use(middleware.Distribute())
-
-		httpRouter.POST("/responses", func(c *gin.Context) {
-			controller.Relay(c, types.RelayFormatOpenAIResponses)
-		})
-		httpRouter.POST("/responses/compact", func(c *gin.Context) {
-			controller.Relay(c, types.RelayFormatOpenAIResponsesCompaction)
-		})
-		httpRouter.POST("/alpha/search", func(c *gin.Context) {
-			controller.Relay(c, types.RelayFormatOpenAIAlphaSearch)
-		})
-		httpRouter.GET("/models", func(c *gin.Context) {
-			controller.ListModels(c, constant.ChannelTypeCodexDisguise)
-		})
+		relayMjRouter.POST("/submit/action", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/shorten", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/modal", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/imagine", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/change", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/simple-change", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/describe", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/blend", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/edits", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/video", controller.RelayMidjourney)
+		//relayMjRouter.POST("/notify", controller.RelayMidjourney)
+		relayMjRouter.GET("/task/:id/fetch", controller.RelayMidjourney)
+		relayMjRouter.GET("/task/:id/image-seed", controller.RelayMidjourney)
+		relayMjRouter.POST("/task/list-by-condition", controller.RelayMidjourney)
+		relayMjRouter.POST("/insight-face/swap", controller.RelayMidjourney)
+		relayMjRouter.POST("/submit/upload-discord-images", controller.RelayMidjourney)
 	}
 }

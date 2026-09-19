@@ -132,6 +132,26 @@ export const ADVANCED_CUSTOM_INCOMING_PATH_OPTIONS: AdvancedCustomIncomingPathOp
       label: 'OpenAI Completions',
     },
     {
+      value: '/v1/audio/speech',
+      label: 'OpenAI Audio Speech',
+    },
+    {
+      value: '/v1/audio/transcriptions',
+      label: 'OpenAI Audio Transcriptions',
+    },
+    {
+      value: '/v1/audio/translations',
+      label: 'OpenAI Audio Translations',
+    },
+    {
+      value: '/v1/rerank',
+      label: 'OpenAI Rerank',
+    },
+    {
+      value: '/v1/realtime',
+      label: 'OpenAI Realtime',
+    },
+    {
       value: '/v1/messages',
       label: 'Claude Messages',
     },

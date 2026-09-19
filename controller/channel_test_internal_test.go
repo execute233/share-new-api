@@ -76,6 +76,7 @@ func TestResponsesCompactChannelSupport(t *testing.T) {
 		want        bool
 	}{
 		{name: "OpenAI", channelType: constant.ChannelTypeOpenAI, apiType: constant.APITypeOpenAI, want: true},
+		{name: "Azure", channelType: constant.ChannelTypeAzure, apiType: constant.APITypeOpenAI, want: true},
 		{name: "Codex", channelType: constant.ChannelTypeCodex, apiType: constant.APITypeCodex, want: true},
 		{name: "Advanced Custom", channelType: constant.ChannelTypeAdvancedCustom, apiType: constant.APITypeAdvancedCustom, want: true},
 		{name: "Sub2API", channelType: constant.ChannelTypeSub2API, apiType: constant.APITypeSub2API, want: true},
@@ -88,11 +89,6 @@ func TestResponsesCompactChannelSupport(t *testing.T) {
 			assert.Equal(t, test.want, common.SupportsResponsesCompact(test.channelType, test.apiType))
 		})
 	}
-}
-
-func TestNormalizeChannelTestEndpointCodexDisguise(t *testing.T) {
-	ch := &model.Channel{Type: constant.ChannelTypeCodexDisguise}
-	assert.Equal(t, string(constant.EndpointTypeOpenAIResponse), normalizeChannelTestEndpoint(ch, ""))
 }
 
 func TestMultiprotocolGatewayEndpointTypes(t *testing.T) {

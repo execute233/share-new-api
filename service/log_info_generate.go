@@ -12,6 +12,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -244,6 +245,18 @@ func appendFinalRequestFormat(relayInfo *relaycommon.RelayInfo, other map[string
 	}
 }
 
+func GenerateWssOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage, modelRatio, groupRatio, completionRatio, audioRatio, audioCompletionRatio, modelPrice, userGroupRatio float64) map[string]interface{} {
+	info := GenerateTextOtherInfo(ctx, relayInfo, modelRatio, groupRatio, completionRatio, 0, 0.0, modelPrice, userGroupRatio)
+	info["ws"] = true
+	info["audio_input"] = usage.InputTokenDetails.AudioTokens
+	info["audio_output"] = usage.OutputTokenDetails.AudioTokens
+	info["text_input"] = usage.InputTokenDetails.TextTokens
+	info["text_output"] = usage.OutputTokenDetails.TextTokens
+	info["audio_ratio"] = audioRatio
+	info["audio_completion_ratio"] = audioCompletionRatio
+	return info
+}
+
 func GenerateAudioOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, modelRatio, groupRatio, completionRatio, audioRatio, audioCompletionRatio, modelPrice, userGroupRatio float64) map[string]interface{} {
 	info := GenerateTextOtherInfo(ctx, relayInfo, modelRatio, groupRatio, completionRatio, 0, 0.0, modelPrice, userGroupRatio)
 	info["audio"] = true
@@ -275,6 +288,17 @@ func GenerateClaudeOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 		info["cache_creation_ratio_1h"] = cacheCreationRatio1h
 	}
 	return info
+}
+
+func GenerateMjOtherInfo(relayInfo *relaycommon.RelayInfo, priceData hosttypes.PriceData) map[string]interface{} {
+	other := make(map[string]interface{})
+	other["model_price"] = priceData.ModelPrice
+	other["group_ratio"] = priceData.GroupRatioInfo.GroupRatio
+	if priceData.GroupRatioInfo.HasSpecialRatio {
+		other["user_group_ratio"] = priceData.GroupRatioInfo.GroupSpecialRatio
+	}
+	appendRequestPath(nil, relayInfo, other)
+	return other
 }
 
 // InjectTieredBillingInfo overlays tiered billing fields onto an existing

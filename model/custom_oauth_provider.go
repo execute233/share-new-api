@@ -39,8 +39,8 @@ var supportedAccessPolicyOps = map[string]struct{}{
 // CustomOAuthProvider stores configuration for custom OAuth providers
 type CustomOAuthProvider struct {
 	Id                    int    `json:"id" gorm:"primaryKey"`
-	Name                  string `json:"name" gorm:"type:varchar(64);not null"`                          // Display name, e.g., "Company SSO"
-	Slug                  string `json:"slug" gorm:"type:varchar(64);uniqueIndex;not null"`              // URL identifier, e.g., "company-sso"
+	Name                  string `json:"name" gorm:"type:varchar(64);not null"`                          // Display name, e.g., "GitHub Enterprise"
+	Slug                  string `json:"slug" gorm:"type:varchar(64);uniqueIndex;not null"`              // URL identifier, e.g., "github-enterprise"
 	Icon                  string `json:"icon" gorm:"type:varchar(128);default:''"`                       // Icon name from @lobehub/icons
 	Enabled               bool   `json:"enabled" gorm:"default:false"`                                   // Whether this provider is enabled
 	ClientId              string `json:"client_id" gorm:"type:varchar(256)"`                             // OAuth client ID

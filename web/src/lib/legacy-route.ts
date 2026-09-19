@@ -30,12 +30,15 @@ const legacyConsoleRoutes: Record<string, string> = {
   '/console/user': '/users',
   '/console/personal': '/profile',
   '/console/log': '/usage-logs',
+  '/console/midjourney': '/usage-logs/drawing',
+  '/console/task': '/usage-logs/task',
 }
 
 const legacySettingsTabs: Record<string, string> = {
   operation: '/system-settings/operations/behavior',
   dashboard: '/system-settings/content/dashboard',
   chats: '/system-settings/content/chat',
+  drawing: '/system-settings/content/drawing',
   payment: '/system-settings/billing/payment',
   ratio: '/system-settings/billing/model-pricing',
   ratelimit: '/system-settings/security/rate-limit',

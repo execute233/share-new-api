@@ -33,7 +33,11 @@ import {
   OAUTH_BIND_RESULT_MESSAGE,
 } from '@/features/auth/constants'
 import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
-import { startOAuthBindResponseDeadline } from '@/features/auth/lib/oauth-bind-window'
+import {
+  parseTelegramBindCallback,
+  postTelegramBindResult,
+  startOAuthBindResponseDeadline,
+} from '@/features/auth/lib/oauth-bind-window'
 import {
   getOAuthSessionStorage,
   resolveOAuthCallbackMode,
@@ -64,12 +68,18 @@ function OAuthCallback() {
     error?: string
     error_description?: string
     redirect?: string
+    telegram_bind?: string
     flow_token?: string
     error_code?: string
   }
   const callbackState = search.state ?? ''
+  const isTelegramBindCallback =
+    provider === 'telegram' &&
+    (search.telegram_bind === 'success' || search.telegram_bind === 'error')
   let mode: 'login' | 'bind' = 'login'
-  if (typeof window !== 'undefined') {
+  if (isTelegramBindCallback) {
+    mode = 'bind'
+  } else if (typeof window !== 'undefined') {
     mode = resolveOAuthCallbackMode(provider, callbackState, {
       opener: window.opener,
       storage: getOAuthSessionStorage(window),
@@ -81,6 +91,30 @@ function OAuthCallback() {
 
     const code = search.code ?? ''
     const state = callbackState
+    const telegramCallback =
+      provider === 'telegram'
+        ? parseTelegramBindCallback({
+            telegram_bind: search.telegram_bind,
+            flow_token: search.flow_token,
+            error_code: search.error_code,
+          })
+        : null
+    if (telegramCallback) {
+      const opener = window.opener
+      if (
+        !postTelegramBindResult(
+          telegramCallback,
+          opener,
+          window.location.origin
+        )
+      ) {
+        toast.error(i18next.t('Telegram binding failed. Please try again.'))
+        const closeTimeout = window.setTimeout(() => window.close(), 1500)
+        return () => window.clearTimeout(closeTimeout)
+      }
+      window.close()
+      return
+    }
 
     if (mode === 'bind') {
       const opener = window.opener
@@ -199,8 +233,11 @@ function OAuthCallback() {
     provider,
     search.code,
     search.error,
+    search.error_code,
     search.error_description,
+    search.flow_token,
     search.redirect,
+    search.telegram_bind,
   ])
 
   return <OAuthCallbackScreen provider={provider} mode={mode} />
