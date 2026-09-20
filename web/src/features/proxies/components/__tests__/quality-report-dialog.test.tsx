@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { render, screen } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
 
@@ -69,7 +87,11 @@ const baseProxy: ProxySummary = {
 describe('QualityReportDialog', () => {
   test('renders summary and per-target rows with brand name, url and status', () => {
     render(
-      <QualityReportDialog proxy={baseProxy} open onOpenChange={() => undefined} />
+      <QualityReportDialog
+        proxy={baseProxy}
+        open
+        onOpenChange={() => undefined}
+      />
     )
 
     expect(screen.getByText('Quality Report')).toBeInTheDocument()
@@ -114,7 +136,11 @@ describe('QualityReportDialog', () => {
       quality_items: [],
     }
     render(
-      <QualityReportDialog proxy={emptyProxy} open onOpenChange={() => undefined} />
+      <QualityReportDialog
+        proxy={emptyProxy}
+        open
+        onOpenChange={() => undefined}
+      />
     )
 
     expect(screen.getByText('No quality results')).toBeInTheDocument()
@@ -125,7 +151,9 @@ describe('QualityReportDialog', () => {
   })
 
   test('renders nothing when proxy is null', () => {
-    render(<QualityReportDialog proxy={null} open onOpenChange={() => undefined} />)
+    render(
+      <QualityReportDialog proxy={null} open onOpenChange={() => undefined} />
+    )
     expect(screen.queryByText('Quality Report')).not.toBeInTheDocument()
   })
 })

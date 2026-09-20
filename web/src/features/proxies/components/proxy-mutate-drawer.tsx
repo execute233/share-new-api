@@ -29,7 +29,6 @@ import {
   sideDrawerHeaderClassName,
 } from '@/components/drawer-layout'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Form,
   FormControl,
@@ -38,6 +37,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -202,9 +202,7 @@ export function ProxyMutateDrawer(props: {
                     <Input
                       type='number'
                       value={field.value}
-                      onChange={(e) =>
-                        field.onChange(Number(e.target.value))
-                      }
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
                   <FormMessage />
@@ -248,7 +246,7 @@ export function ProxyMutateDrawer(props: {
               )}
             />
             {isShadowsocks && (
-              <p className='text-sm text-muted-foreground'>
+              <p className='text-muted-foreground text-sm'>
                 {t(
                   'For Shadowsocks, the encryption method goes in the first field (e.g. aes-256-gcm, chacha20-ietf-poly1305) and the password in the second. You can also paste a full ss:// URL in quick add.'
                 )}
@@ -270,7 +268,9 @@ export function ProxyMutateDrawer(props: {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value='active'>{t('Active')}</SelectItem>
-                        <SelectItem value='inactive'>{t('Inactive')}</SelectItem>
+                        <SelectItem value='inactive'>
+                          {t('Inactive')}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>

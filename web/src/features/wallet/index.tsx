@@ -125,15 +125,6 @@ export function Wallet(props: WalletProps) {
     }
   }, [])
 
-  const handleRedeem = useCallback(
-    async (code: string): Promise<boolean> => {
-      const ok = await redeemCode(code)
-      if (ok) await fetchUser()
-      return ok
-    },
-    [redeemCode, fetchUser]
-  )
-
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
@@ -216,6 +207,17 @@ export function Wallet(props: WalletProps) {
 
     if (success) {
       setConfirmDialogOpen(false)
+      await fetchUser()
+    }
+  }
+
+  // Handle redemption
+  const handleRedeem = async () => {
+    if (!redemptionCode) return
+
+    const success = await redeemCode(redemptionCode)
+    if (success) {
+      setRedemptionCode('')
       await fetchUser()
     }
   }

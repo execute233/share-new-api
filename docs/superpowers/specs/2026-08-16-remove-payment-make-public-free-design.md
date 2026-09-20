@@ -1,3 +1,5 @@
+> 历史方案：已被本次 main 集成方案取代。当前保留 main 全部功能；下文仅作历史记录，不作为实现要求。
+
 # Design: Remove Payment System, Make Public Free Relay
 
 日期：2026-08-16

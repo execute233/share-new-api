@@ -59,28 +59,28 @@ type Proxy struct {
 }
 
 type ProxySummary struct {
-	ID                      int    `json:"id"`
-	Name                    string `json:"name"`
-	Protocol                string `json:"protocol"`
-	Host                    string `json:"host"`
-	Port                    int    `json:"port"`
-	Status                  string `json:"status"`
-	LatencyMS               *int   `json:"latency_ms,omitempty"`
-	IPAddress               string `json:"ip_address,omitempty"`
-	Country                 string `json:"country,omitempty"`
-	CountryCode             string `json:"country_code,omitempty"`
-	Region                  string `json:"region,omitempty"`
-	City                    string `json:"city,omitempty"`
-	QualityStatus           string `json:"quality_status,omitempty"`
-	QualityScore            *int   `json:"quality_score,omitempty"`
-	QualityGrade            string `json:"quality_grade,omitempty"`
-	QualitySummary          string `json:"quality_summary,omitempty"`
-	LastCheckedAt           *int64 `json:"last_checked_at,omitempty"`
-	CredentialConfigured    bool   `json:"credential_configured"`
-	CredentialDecryptFailed bool   `json:"credential_decrypt_failed"`
-	BoundChannelCount       int64  `json:"bound_channel_count"`
-	LastHTTPStatus          *int   `json:"last_http_status,omitempty"`
-	LastError               string `json:"last_error,omitempty"`
+	ID                      int                `json:"id"`
+	Name                    string             `json:"name"`
+	Protocol                string             `json:"protocol"`
+	Host                    string             `json:"host"`
+	Port                    int                `json:"port"`
+	Status                  string             `json:"status"`
+	LatencyMS               *int               `json:"latency_ms,omitempty"`
+	IPAddress               string             `json:"ip_address,omitempty"`
+	Country                 string             `json:"country,omitempty"`
+	CountryCode             string             `json:"country_code,omitempty"`
+	Region                  string             `json:"region,omitempty"`
+	City                    string             `json:"city,omitempty"`
+	QualityStatus           string             `json:"quality_status,omitempty"`
+	QualityScore            *int               `json:"quality_score,omitempty"`
+	QualityGrade            string             `json:"quality_grade,omitempty"`
+	QualitySummary          string             `json:"quality_summary,omitempty"`
+	LastCheckedAt           *int64             `json:"last_checked_at,omitempty"`
+	CredentialConfigured    bool               `json:"credential_configured"`
+	CredentialDecryptFailed bool               `json:"credential_decrypt_failed"`
+	BoundChannelCount       int64              `json:"bound_channel_count"`
+	LastHTTPStatus          *int               `json:"last_http_status,omitempty"`
+	LastError               string             `json:"last_error,omitempty"`
 	QualityItems            []ProxyQualityItem `json:"quality_items,omitempty"`
 }
 

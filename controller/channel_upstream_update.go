@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/relay/channel/advancedcustom"
 	"github.com/QuantumNous/new-api/relay/channel/gemini"
 	"github.com/QuantumNous/new-api/relay/channel/ollama"
@@ -304,6 +305,34 @@ func sanitizeFetchModelsError(err error, key string) error {
 	return errors.New(message)
 }
 
+func sanitizeAdvancedCustomRequestError(err error, key string, requestURL string) error {
+	err = sanitizeFetchModelsError(err, key)
+	if err == nil {
+		return nil
+	}
+	parsedURL, parseErr := url.Parse(requestURL)
+	if parseErr != nil {
+		return err
+	}
+	message := err.Error()
+	for _, value := range parsedURL.Query() {
+		for _, secret := range value {
+			if secret == "" {
+				continue
+			}
+			message = strings.ReplaceAll(message, secret, "[REDACTED]")
+			message = strings.ReplaceAll(message, url.QueryEscape(secret), "[REDACTED]")
+			message = strings.ReplaceAll(message, url.PathEscape(secret), "[REDACTED]")
+		}
+	}
+	if key != "" {
+		message = strings.ReplaceAll(message, key, "[REDACTED]")
+		message = strings.ReplaceAll(message, url.QueryEscape(key), "[REDACTED]")
+		message = strings.ReplaceAll(message, url.PathEscape(key), "[REDACTED]")
+	}
+	return errors.New(message)
+}
+
 func getFetchModelsResponseBody(method string, requestURL string, channel *model.Channel, headers http.Header) ([]byte, error) {
 	request, err := http.NewRequest(method, requestURL, nil)
 	if err != nil {
@@ -337,7 +366,14 @@ func getFetchModelsResponseBody(method string, requestURL string, channel *model
 }
 
 func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
-	baseURL := constant.ChannelBaseURLs[channel.Type]
+	if channel.Type == constant.ChannelTypeTaskPlugin {
+		plugin, ok := jsplugin.DefaultRegistry.Get(channel.GetSetting().TaskPluginKey)
+		if !ok {
+			return nil, fmt.Errorf("task plugin %q is not registered", channel.GetSetting().TaskPluginKey)
+		}
+		return normalizeModelNames(plugin.Meta.Models), nil
+	}
+	baseURL := constant.GetChannelBaseURL(channel.Type)
 	if channel.GetBaseURL() != "" {
 		baseURL = channel.GetBaseURL()
 	}
@@ -370,7 +406,7 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 		return normalizeModelNames(models), nil
 	}
 
-	if channel.Type == constant.ChannelTypeAdvancedCustom {
+	if constant.IsAdvancedCustomChannel(channel.Type) {
 		return fetchAdvancedCustomUpstreamModelIDs(channel, baseURL)
 	}
 
@@ -389,10 +425,13 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 			url = fmt.Sprintf("%s/api/paas/v4/models", baseURL)
 		}
 	case constant.ChannelTypeVolcEngine:
+		// 火山方舟 OpenAI 兼容 API 根路径是 /api/v3（chat/embeddings 均为
+		// {base}/api/v3/...，见 relay/channel/volcengine 的 GetRequestURL），
+		// 不存在 /v1/models 端点。原拼接会导致「获取模型列表」固定 404 失败。
 		if plan, ok := constant.ChannelSpecialBases[baseURL]; ok && plan.OpenAIBaseURL != "" {
 			url = fmt.Sprintf("%s/v1/models", plan.OpenAIBaseURL)
 		} else {
-			url = fmt.Sprintf("%s/v1/models", baseURL)
+			url = fmt.Sprintf("%s/api/v3/models", baseURL)
 		}
 	case constant.ChannelTypeMoonshot:
 		if plan, ok := constant.ChannelSpecialBases[baseURL]; ok && plan.OpenAIBaseURL != "" {
@@ -417,7 +456,7 @@ func fetchChannelUpstreamModelIDs(channel *model.Channel) ([]string, error) {
 
 	body, err := getFetchModelsResponseBody(http.MethodGet, url, channel, headers)
 	if err != nil {
-		return nil, sanitizeFetchModelsError(err, key)
+		return nil, sanitizeAdvancedCustomRequestError(err, key, url)
 	}
 
 	var result OpenAIModelsResponse
@@ -445,7 +484,7 @@ func fetchAdvancedCustomUpstreamModelIDs(channel *model.Channel, baseURL string)
 		RelayMode:      relayconstant.RelayModeUnknown,
 		RequestURLPath: dto.AdvancedCustomModelListPath,
 		ChannelMeta: &relaycommon.ChannelMeta{
-			ChannelType:          constant.ChannelTypeAdvancedCustom,
+			ChannelType:          channel.Type,
 			ChannelBaseUrl:       baseURL,
 			ApiKey:               key,
 			ChannelOtherSettings: channel.GetOtherSettings(),
@@ -470,7 +509,7 @@ func fetchAdvancedCustomUpstreamModelIDs(channel *model.Channel, baseURL string)
 
 func updateChannelUpstreamModelSettings(channel *model.Channel, settings dto.ChannelOtherSettings, updateModels bool) error {
 	channel.SetOtherSettings(settings)
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"settings": channel.OtherSettings,
 	}
 	if updateModels {
@@ -861,7 +900,7 @@ func ApplyChannelUpstreamModelUpdates(c *gin.Context) {
 		refreshChannelRuntimeCache()
 	}
 
-	recordManageAudit(c, "channel.upstream_apply", map[string]interface{}{
+	recordManageAudit(c, "channel.upstream_apply", map[string]any{
 		"id": channel.Id,
 	})
 	c.JSON(http.StatusOK, gin.H{
@@ -1059,7 +1098,7 @@ func ApplyAllChannelUpstreamModelUpdates(c *gin.Context) {
 		refreshChannelRuntimeCache()
 	}
 
-	recordManageAudit(c, "channel.upstream_apply_all", map[string]interface{}{
+	recordManageAudit(c, "channel.upstream_apply_all", map[string]any{
 		"count": len(results),
 	})
 	c.JSON(http.StatusOK, gin.H{
@@ -1100,7 +1139,7 @@ func DetectAllChannelUpstreamModelUpdates(c *gin.Context) {
 		return
 	}
 
-	recordManageAudit(c, "channel.upstream_detect_all", map[string]interface{}{
+	recordManageAudit(c, "channel.upstream_detect_all", map[string]any{
 		"task_id": task.TaskID,
 	})
 	c.JSON(http.StatusOK, gin.H{

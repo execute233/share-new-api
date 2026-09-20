@@ -17,9 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  createRouter,
+  createRootRoute,
+  createMemoryHistory,
+  RouterContextProvider,
+} from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 vi.mock('@/lib/lobe-icon', () => ({
   getLobeIcon: () => null,
@@ -40,6 +49,20 @@ await i18n.use(initReactI18next).init({
 type ApiMethod = (url: string, data?: unknown) => Promise<{ data: unknown }>
 type MockableApi = { get: ApiMethod }
 const apiClient = api as unknown as MockableApi
+
+const originalAuth = useAuthStore.getState().auth
+beforeEach(() => {
+  useAuthStore.setState({
+    auth: {
+      ...originalAuth,
+      user: { id: 1, username: 'root', role: ROLE.SUPER_ADMIN },
+    },
+  })
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+  useAuthStore.setState({ auth: originalAuth })
+})
 
 const proxyUs = {
   id: 1,
@@ -66,7 +89,7 @@ const proxyEu = {
 }
 
 function installApiFixtures(options?: { channel?: Record<string, unknown> }) {
-  apiClient.get = async (url) => {
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => {
     if (url === '/api/proxy/all') {
       return { data: { success: true, data: [proxyUs, proxyEu] } }
     }
@@ -74,7 +97,7 @@ function installApiFixtures(options?: { channel?: Record<string, unknown> }) {
       return { data: { success: true, data: options.channel } }
     }
     return { data: { success: true, data: [] } }
-  }
+  })
 }
 
 function renderDrawer(options?: { channel?: Record<string, unknown> }) {
@@ -82,20 +105,24 @@ function renderDrawer(options?: { channel?: Record<string, unknown> }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
   render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <ChannelsProvider>
-          <ChannelMutateDrawer
-            open
-            onOpenChange={() => undefined}
-            currentRow={
-              options?.channel
-                ? ({ id: options.channel.id } as never)
-                : null
-            }
-          />
-        </ChannelsProvider>
+        <RouterContextProvider router={router}>
+          <ChannelsProvider>
+            <ChannelMutateDrawer
+              open
+              onOpenChange={() => undefined}
+              currentRow={
+                options?.channel ? ({ id: options.channel.id } as never) : null
+              }
+            />
+          </ChannelsProvider>
+        </RouterContextProvider>
       </QueryClientProvider>
     </I18nextProvider>
   )
@@ -103,10 +130,11 @@ function renderDrawer(options?: { channel?: Record<string, unknown> }) {
 
 async function openProxySelect() {
   const user = userEvent.setup()
+  await user.click(await screen.findByRole('option', { name: /^OpenAI / }))
   await screen.findByRole('textbox', { name: 'Name *' })
   await user.click(
-    screen.getByRole('button', {
-      name: /Advanced Settings Request overrides/,
+    screen.getByRole('tab', {
+      name: /Other Settings/,
     })
   )
   const proxySelect = await screen.findByRole('combobox', { name: 'Proxy' })
@@ -118,12 +146,8 @@ describe('Channel mutate drawer proxy selection', () => {
     renderDrawer()
     await openProxySelect()
 
-    expect(
-      await screen.findByRole('option', { name: 'proxy-us' })
-    ).toBeTruthy()
-    expect(
-      await screen.findByRole('option', { name: 'proxy-eu' })
-    ).toBeTruthy()
+    expect(await screen.findByRole('option', { name: 'proxy-us' })).toBeTruthy()
+    expect(await screen.findByRole('option', { name: 'proxy-eu' })).toBeTruthy()
     expect(
       screen.getByRole('option', { name: 'Direct (No Proxy)' })
     ).toBeTruthy()
@@ -134,9 +158,7 @@ describe('Channel mutate drawer proxy selection', () => {
     await openProxySelect()
     const user = userEvent.setup()
 
-    await user.click(
-      await screen.findByRole('option', { name: 'proxy-us' })
-    )
+    await user.click(await screen.findByRole('option', { name: 'proxy-us' }))
 
     expect(screen.getByRole('combobox', { name: 'Proxy' })).toHaveTextContent(
       'proxy-us'
@@ -167,8 +189,8 @@ describe('Channel mutate drawer proxy selection', () => {
     const user = userEvent.setup()
     await screen.findByRole('textbox', { name: 'Name *' })
     await user.click(
-      screen.getByRole('button', {
-        name: /Advanced Settings Request overrides/,
+      screen.getByRole('tab', {
+        name: /Other Settings/,
       })
     )
 

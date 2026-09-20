@@ -372,11 +372,16 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 	return resp, nil
 }
 
+// DoWssRequest dials the adaptor's upstream over WebSocket for the realtime
+// and Responses WebSocket relays. It honors the channel proxy, is bound to the
+// request context, and reports a rejected handshake as a *types.NewAPIError
+// carrying the upstream status code (types.NewError preserves it).
 func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*websocket.Conn, error) {
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	fullRequestURL = toWebSocketURL(fullRequestURL)
 	targetHeader := http.Header{}
 	err = a.SetupRequestHeader(c, &targetHeader, info)
 	if err != nil {
@@ -392,14 +397,44 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		targetHeader.Set(key, value)
 	}
 	targetHeader.Set("Content-Type", c.Request.Header.Get("Content-Type"))
-	targetConn, _, err := websocket.DefaultDialer.Dial(fullRequestURL, targetHeader)
-	if err != nil {
-		return nil, fmt.Errorf("dial failed to %s: %w", common.SanitizeURLForLog(fullRequestURL), err)
+	dialer := *websocket.DefaultDialer
+	if info.ChannelSetting.Proxy != "" {
+		client, proxyErr := service.NewProxyHttpClient(info.ChannelSetting.Proxy)
+		if proxyErr != nil {
+			return nil, proxyErr
+		}
+		transport, ok := client.Transport.(*http.Transport)
+		if !ok {
+			return nil, errors.New("invalid proxy transport")
+		}
+		dialer.Proxy = transport.Proxy
+		dialer.NetDialContext = transport.DialContext
 	}
-	// send request body
-	//all, err := io.ReadAll(requestBody)
-	//err = service.WssString(c, targetConn, string(all))
+	targetConn, resp, err := dialer.DialContext(c.Request.Context(), fullRequestURL, targetHeader)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if resp != nil {
+			statusCode = resp.StatusCode
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+		}
+		return nil, types.NewErrorWithStatusCode(fmt.Errorf("dial failed to %s: %w", common.SanitizeURLForLog(fullRequestURL), err), types.ErrorCodeDoRequestFailed, statusCode)
+	}
 	return targetConn, nil
+}
+
+// toWebSocketURL maps an http(s) endpoint to ws(s). Realtime adaptors already
+// return ws(s) URLs, which pass through unchanged.
+func toWebSocketURL(raw string) string {
+	switch {
+	case strings.HasPrefix(raw, "https://"):
+		return "wss://" + strings.TrimPrefix(raw, "https://")
+	case strings.HasPrefix(raw, "http://"):
+		return "ws://" + strings.TrimPrefix(raw, "http://")
+	default:
+		return raw
+	}
 }
 
 func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) (context.CancelFunc, <-chan struct{}) {
@@ -488,7 +523,7 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 }
 
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
-	client, err := service.GetHttpClientWithProxySettings(info.ChannelProxyURL, info.ChannelSetting)
+	client, err := service.GetHttpClientWithProxySettings(info.ChannelSetting.Proxy, info.ChannelSetting)
 	if err != nil {
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)
 	}
@@ -563,7 +598,7 @@ func DoTaskApiRequest(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, req
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	req, err := newTaskAPIRequest(c, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
@@ -586,4 +621,11 @@ func DoTaskApiRequest(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, req
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
 	return resp, nil
+}
+
+func newTaskAPIRequest(c *gin.Context, fullRequestURL string, requestBody io.Reader) (*http.Request, error) {
+	if c == nil || c.Request == nil {
+		return nil, errors.New("task client request is missing")
+	}
+	return http.NewRequestWithContext(c.Request.Context(), c.Request.Method, fullRequestURL, requestBody)
 }

@@ -168,6 +168,15 @@ func TestFetchAdvancedCustomModelsRedactsQueryKeyFromTransportErrors(t *testing.
 		Err: errors.New("connection refused"),
 	}, secret)
 	require.EqualError(t, direct, "connection refused")
+
+	queryValue := "prefix-" + secret
+	queryError := sanitizeAdvancedCustomRequestError(
+		errors.New("dial "+queryValue+": connection refused"),
+		queryValue,
+		baseURL+"/v1/models?custom-token="+url.QueryEscape(queryValue),
+	)
+	require.NotContains(t, queryError.Error(), queryValue)
+	require.EqualError(t, queryError, "dial [REDACTED]: connection refused")
 }
 
 func TestFetchOrdinaryOpenAIModelsKeepsExistingEmptyDataBehavior(t *testing.T) {
@@ -234,6 +243,9 @@ func TestFetchModelsAdvancedCustomCreatePreview(t *testing.T) {
 
 func TestFetchModelsAdvancedCustomEditPreviewUsesSavedKeyAndExplicitClears(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Proxy{}))
+	proxy := model.Proxy{Name: "preview", Protocol: model.ProxyProtocolHTTP, Host: "127.0.0.1", Port: 1, Status: model.ProxyStatusActive}
+	require.NoError(t, db.Create(&proxy).Error)
 	receivedHeaders := make(chan http.Header, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedHeaders <- r.Header.Clone()
@@ -253,14 +265,14 @@ func TestFetchModelsAdvancedCustomEditPreviewUsesSavedKeyAndExplicitClears(t *te
 	}
 	savedHeaderOverride := `{"X-Saved":"must-not-be-sent"}`
 	savedChannel.HeaderOverride = &savedHeaderOverride
-	savedChannel.SetSetting(dto.ChannelSettings{Proxy: "http://127.0.0.1:1"})
+	savedChannel.ProxyID = &proxy.ID
 	require.NoError(t, db.Create(savedChannel).Error)
 
 	preserved, err := buildAdvancedCustomModelPreviewChannel(fetchModelsRequest{ChannelID: savedChannel.Id})
 	require.NoError(t, err)
 	require.Equal(t, "http://127.0.0.1:1", preserved.GetBaseURL())
 	require.Equal(t, savedHeaderOverride, *preserved.HeaderOverride)
-	require.Equal(t, "http://127.0.0.1:1", preserved.GetSetting().Proxy)
+	require.Equal(t, &proxy.ID, preserved.ProxyID)
 
 	previewConfig := dto.AdvancedCustomConfig{Routes: []dto.AdvancedCustomRoute{{
 		IncomingPath: dto.AdvancedCustomModelListPath,
@@ -279,22 +291,21 @@ func TestFetchModelsAdvancedCustomEditPreviewUsesSavedKeyAndExplicitClears(t *te
 		Key:            "request-key-must-be-ignored",
 		AdvancedCustom: &rawConfig,
 		HeaderOverride: &explicitEmpty,
-		Proxy:          &explicitEmpty,
+		ProxyIDSet:     true,
 	}
 	cleared, err := buildAdvancedCustomModelPreviewChannel(fetchModelsRequest{
 		ChannelID:      savedChannel.Id,
 		BaseURL:        &explicitEmpty,
 		AdvancedCustom: &rawConfig,
 		HeaderOverride: &explicitEmpty,
-		Proxy:          &explicitEmpty,
+		ProxyIDSet:     true,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, cleared.BaseURL)
 	require.Empty(t, *cleared.BaseURL)
 	require.NotNil(t, cleared.HeaderOverride)
 	require.Empty(t, *cleared.HeaderOverride)
-	// Legacy proxy settings are retained as historical data but no longer drive runtime requests.
-	require.Equal(t, "http://127.0.0.1:1", cleared.GetSetting().Proxy)
+	require.Nil(t, cleared.ProxyID)
 
 	body, err := common.Marshal(req)
 	require.NoError(t, err)
@@ -526,7 +537,7 @@ func TestCollectPendingUpstreamModelChangesFromModels_WithIgnoredRegexPatterns(t
 
 func TestBuildUpstreamModelUpdateTaskNotificationContent_OmitOverflowDetails(t *testing.T) {
 	channelSummaries := make([]upstreamModelUpdateChannelSummary, 0, 12)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		channelSummaries = append(channelSummaries, upstreamModelUpdateChannelSummary{
 			ChannelName: "channel-" + string(rune('A'+i)),
 			AddCount:    i + 1,

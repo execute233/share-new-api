@@ -104,8 +104,6 @@ describe('Proxy mutate drawer shadowsocks', () => {
     await user.click(await screen.findByRole('option', { name: 'ss' }))
 
     expect(findLabel('Encryption method')).toBeTruthy()
-    expect(
-      screen.getByPlaceholderText('chacha20-ietf-poly1305')
-    ).toBeTruthy()
+    expect(screen.getByPlaceholderText('chacha20-ietf-poly1305')).toBeTruthy()
   })
 })

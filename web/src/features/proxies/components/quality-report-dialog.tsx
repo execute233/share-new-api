@@ -124,7 +124,7 @@ export function QualityReportDialog(props: {
                 <td className='p-3'>
                   <div className='font-medium'>{targetLabel(item)}</div>
                   {item.url ? (
-                    <div className='text-muted-foreground break-all text-xs'>
+                    <div className='text-muted-foreground text-xs break-all'>
                       {item.url}
                     </div>
                   ) : null}

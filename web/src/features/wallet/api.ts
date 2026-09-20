@@ -214,7 +214,7 @@ export async function getUserBillingHistory(
   if (keyword) {
     params.append('keyword', keyword)
   }
-  const res = await api.get(`/api/log/self?${params.toString()}`)
+  const res = await api.get(`/api/user/topup/self?${params.toString()}`)
   return res.data
 }
 

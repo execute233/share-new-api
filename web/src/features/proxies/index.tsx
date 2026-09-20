@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, RefreshCw, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -78,10 +96,7 @@ function QuickAddDialog(props: {
         <Textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder='每行输入一个代理，支持以下格式：
-          sock5://user:pass@192.168.1.1:1080
-          http://192.168.1.1:8080
-          https://user:pass@proxy.example.com:443'
+          placeholder={t('Enter one proxy URL per line')}
           rows={8}
         />
         {result && (
@@ -158,7 +173,12 @@ export function Proxies() {
     }
   }
   const handleTest = async (proxy: ProxySummary) => {
-    const response = await runProxyAction(proxy, 'test', testProxy, t('Proxy test failed'))
+    const response = await runProxyAction(
+      proxy,
+      'test',
+      testProxy,
+      t('Proxy test failed')
+    )
     if (response) {
       refresh()
     }
@@ -282,7 +302,8 @@ export function Proxies() {
                           disabled={running?.id === proxy.id}
                           onClick={() => void handleTest(proxy)}
                         >
-                          {running?.id === proxy.id && running.kind === 'test' ? (
+                          {running?.id === proxy.id &&
+                          running.kind === 'test' ? (
                             <Spinner className='mr-1' />
                           ) : null}
                           {t('Test')}

@@ -2,9 +2,11 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -21,12 +23,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateChannelIgnoresLegacyProxySetting(t *testing.T) {
-	setting, err := common.Marshal(dto.ChannelSettings{Proxy: "ftp://legacy.invalid/path"})
-	require.NoError(t, err)
-	channel := &model.Channel{Type: constant.ChannelTypeOpenAI, Setting: common.GetPointer(string(setting))}
+func TestGetChannelDefaultBaseURLsUsesBuiltInDefaults(t *testing.T) {
+	originalBaseURLs := constant.ChannelBaseURLs
+	constant.ChannelBaseURLs = append([]string(nil), originalBaseURLs...)
+	constant.ChannelBaseURLs[constant.ChannelTypeDeepSeek] = "https://deepseek.server.example"
+	t.Cleanup(func() {
+		constant.ChannelBaseURLs = originalBaseURLs
+	})
 
-	require.NoError(t, validateChannel(channel, false))
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/channel/default_base_urls", nil)
+	GetChannelDefaultBaseURLs(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Success bool           `json:"success"`
+		Data    map[int]string `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	assert.Equal(t, "https://deepseek.server.example", response.Data[constant.ChannelTypeDeepSeek])
+	assert.Equal(t, "https://api.openai.com", response.Data[constant.ChannelTypeOpenAI])
+	assert.NotContains(t, response.Data, constant.ChannelTypeAzure)
+	assert.NotContains(t, response.Data, constant.ChannelTypeNewAPI)
+	assert.NotContains(t, response.Data, constant.ChannelTypeTaskPlugin)
+}
+
+func TestValidateChannelProxyBinding(t *testing.T) {
+	db := setupProxyControllerTestDB(t)
+	proxy := model.Proxy{Name: "pool", Protocol: model.ProxyProtocolHTTP, Host: "127.0.0.1", Port: 8080, Status: model.ProxyStatusActive}
+	require.NoError(t, db.Create(&proxy).Error)
+	for _, tc := range []struct {
+		name    string
+		id      *int
+		wantErr bool
+	}{
+		{"direct", nil, false},
+		{"active", &proxy.ID, false},
+		{"missing", common.GetPointer(proxy.ID + 1), true},
+		{"invalid", common.GetPointer(0), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			channel := &model.Channel{Type: constant.ChannelTypeOpenAI, ProxyID: tc.id}
+			err := validateChannel(channel, false)
+			if tc.wantErr {
+				require.ErrorContains(t, err, "invalid channel proxy")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestValidateChannelRequiresNewAPIBaseURL(t *testing.T) {
@@ -105,7 +152,7 @@ func TestMultiprotocolGatewayEndpointTypes(t *testing.T) {
 	assert.Equal(t, want, common.GetEndpointTypesByChannelType(constant.ChannelTypeSub2API, "gpt-5"))
 }
 
-func TestCopyChannelIgnoresInvalidLegacyProxySettings(t *testing.T) {
+func TestCopyChannelIgnoresLegacyProxySettings(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
 	settingBytes, err := common.Marshal(dto.ChannelSettings{
 		Proxy: "socks5://proxy.example/legacy-path",
@@ -135,9 +182,9 @@ func TestCopyChannelIgnoresInvalidLegacyProxySettings(t *testing.T) {
 	assert.Equal(t, int64(2), channelCount)
 }
 
-func TestDeleteMissingChannelDoesNotResetProxyCache(t *testing.T) {
+func TestDeleteChannelResetsProxyCacheWhenPreReadFails(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.Log{}, &model.AuditLog{}))
 	service.ResetProxyClientCache()
 	t.Cleanup(service.ResetProxyClientCache)
 
@@ -155,12 +202,12 @@ func TestDeleteMissingChannelDoesNotResetProxyCache(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"success":true`)
 	afterDelete, err := service.GetHttpClientWithProxy(proxyURL)
 	require.NoError(t, err)
-	assert.Same(t, beforeDelete, afterDelete)
+	assert.NotSame(t, beforeDelete, afterDelete)
 }
 
 func TestDeleteChannelBatchReportsAndAuditsActualDeletedCount(t *testing.T) {
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.Log{}, &model.AuditLog{}))
 	channel := &model.Channel{Name: "existing", Key: "test-key"}
 	require.NoError(t, db.Create(channel).Error)
 
@@ -181,14 +228,16 @@ func TestDeleteChannelBatchReportsAndAuditsActualDeletedCount(t *testing.T) {
 	assert.True(t, response.Success)
 	assert.Equal(t, int64(1), response.Data)
 
-	var auditLog model.Log
+	var auditLog model.AuditLog
 	require.NoError(t, db.Order("id desc").First(&auditLog).Error)
 	var auditData struct {
 		Operation struct {
 			Params map[string]any `json:"params"`
 		} `json:"op"`
 	}
-	require.NoError(t, common.UnmarshalJsonStr(auditLog.Other, &auditData))
+	encodedAudit, err := common.Marshal(auditLog.Other)
+	require.NoError(t, err)
+	require.NoError(t, common.Unmarshal(encodedAudit, &auditData))
 	assert.Equal(t, float64(1), auditData.Operation.Params["count"])
 }
 
@@ -250,10 +299,11 @@ func TestBuildTestLogOtherInjectsTieredInfo(t *testing.T) {
 		RequestRules: requestRules,
 	})
 
-	require.Equal(t, "tiered_expr", other["billing_mode"])
-	require.Equal(t, "base", other["matched_tier"])
-	require.Equal(t, requestRules, other["request_rules"])
-	require.NotEmpty(t, other["expr_b64"])
+	fields := other.Snapshot()
+	require.Equal(t, "tiered_expr", fields["billing_mode"])
+	require.Equal(t, "base", fields["matched_tier"])
+	require.Equal(t, requestRules, fields["request_rules"])
+	require.NotEmpty(t, fields["expr_b64"])
 }
 
 func TestResolveChannelTestUserIDUsesRequestUser(t *testing.T) {
@@ -310,6 +360,111 @@ func TestSelectChannelsForAutomaticTestAutoBanOnlyUsesEligibleChannels(t *testin
 	require.Len(t, selected, 2)
 	require.Equal(t, 1, selected[0].Id)
 	require.Equal(t, 3, selected[1].Id)
+}
+
+func TestRunChannelTestWorkersHonorsConfiguredConcurrency(t *testing.T) {
+	originalInterval := common.RequestInterval
+	common.RequestInterval = 0
+	t.Cleanup(func() { common.RequestInterval = originalInterval })
+
+	channels := []*model.Channel{
+		{Id: 1, Status: common.ChannelStatusEnabled},
+		{Id: 2, Status: common.ChannelStatusEnabled},
+		{Id: 3, Status: common.ChannelStatusEnabled},
+		{Id: 4, Status: common.ChannelStatusEnabled},
+	}
+	started := make(chan struct{}, len(channels))
+	release := make(chan struct{})
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	progress := make([]int, 0, len(channels)+1)
+	summaryResult := make(chan channelTestSummary, 1)
+
+	go func() {
+		summaryResult <- runChannelTestWorkers(
+			context.Background(),
+			channels,
+			2,
+			func(_ context.Context, _ *model.Channel) channelTestSummary {
+				current := active.Add(1)
+				defer active.Add(-1)
+				for {
+					observed := maxActive.Load()
+					if current <= observed || maxActive.CompareAndSwap(observed, current) {
+						break
+					}
+				}
+				started <- struct{}{}
+				<-release
+				return channelTestSummary{Tested: 1, Succeeded: 1}
+			},
+			func(processed, _ int) {
+				progress = append(progress, processed)
+			},
+		)
+	}()
+
+	<-started
+	<-started
+	select {
+	case <-started:
+		t.Fatal("started more channel tests than the configured concurrency")
+	default:
+	}
+	close(release)
+
+	summary := <-summaryResult
+
+	assert.Equal(t, int32(2), maxActive.Load())
+	assert.Equal(t, channelTestSummary{Tested: 4, Succeeded: 4}, summary)
+	assert.Equal(t, []int{0, 1, 2, 3, 4}, progress)
+}
+
+func TestRunChannelTestWorkersStopsAfterCancellation(t *testing.T) {
+	originalInterval := common.RequestInterval
+	common.RequestInterval = 0
+	t.Cleanup(func() { common.RequestInterval = originalInterval })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	channels := []*model.Channel{
+		{Id: 1, Status: common.ChannelStatusEnabled},
+		{Id: 2, Status: common.ChannelStatusEnabled},
+		{Id: 3, Status: common.ChannelStatusEnabled},
+		{Id: 4, Status: common.ChannelStatusEnabled},
+	}
+	started := make(chan struct{}, len(channels))
+	progress := make([]int, 0, 1)
+	summaryResult := make(chan channelTestSummary, 1)
+
+	go func() {
+		summaryResult <- runChannelTestWorkers(
+			ctx,
+			channels,
+			2,
+			func(ctx context.Context, _ *model.Channel) channelTestSummary {
+				started <- struct{}{}
+				<-ctx.Done()
+				return channelTestSummary{Tested: 1, Succeeded: 1}
+			},
+			func(processed, _ int) {
+				progress = append(progress, processed)
+			},
+		)
+	}()
+
+	<-started
+	<-started
+	cancel()
+
+	summary := <-summaryResult
+
+	select {
+	case <-started:
+		t.Fatal("started another channel test after cancellation")
+	default:
+	}
+	assert.Equal(t, channelTestSummary{Tested: 2, Succeeded: 2}, summary)
+	assert.Equal(t, []int{0}, progress)
 }
 
 func TestTestAllChannelsRejectsExistingActiveTask(t *testing.T) {

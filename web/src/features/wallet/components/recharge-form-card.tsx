@@ -66,7 +66,7 @@ interface RechargeFormCardProps {
   paymentLoading: string | null
   redemptionCode: string
   onRedemptionCodeChange: (code: string) => void
-  onRedeem: (code: string) => Promise<boolean | void>
+  onRedeem: () => void
   redeeming: boolean
   topupLink?: string
   loading?: boolean
@@ -526,7 +526,7 @@ export function RechargeFormCard({
               className='h-9 min-w-0'
             />
             <Button
-              onClick={() => onRedeem(redemptionCode)}
+              onClick={onRedeem}
               disabled={redeeming}
               variant='outline'
               className='h-9 px-4'
