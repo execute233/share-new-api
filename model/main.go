@@ -354,6 +354,9 @@ func migrateDB() error {
 		&QuotaData{},
 		&AdminDashboardBucket{},
 		&AdminDashboardCollection{},
+		&OpsCollection{},
+		&OpsEvent{},
+		&OpsBucket{},
 		&Task{},
 		&TaskPlugin{},
 		&Model{},
@@ -376,6 +379,9 @@ func migrateDB() error {
 		&AuthzRole{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&OpsCollection{ID: 1, StartedAt: time.Now().Unix()}).Error; err != nil {
 		return err
 	}
 	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&AdminDashboardCollection{ID: 1, StartedAt: time.Now().Unix()}).Error; err != nil {

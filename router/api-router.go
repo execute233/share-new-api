@@ -338,6 +338,8 @@ func SetApiRouter(router *gin.Engine) {
 		}
 
 		apiRouter.GET("/admin-dashboard", middleware.AdminAuth(), controller.GetAdminDashboard)
+		apiRouter.GET("/ops-monitor", middleware.AdminAuth(), controller.GetOpsMonitor)
+		apiRouter.GET("/ops-monitor/events", middleware.AdminAuth(), controller.GetOpsMonitorEvents)
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)

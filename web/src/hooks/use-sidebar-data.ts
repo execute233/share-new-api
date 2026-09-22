@@ -140,6 +140,12 @@ export function useSidebarData(): SidebarData {
             requiredRole: ROLE.ADMIN,
           },
           {
+            title: t('Operations monitoring'),
+            url: '/ops-monitor',
+            icon: Radio,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,

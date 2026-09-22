@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/opsmonitor"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
@@ -210,6 +211,7 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 				}
 			}
 			won, err := task.UpdateWithStatus(preStatus)
+			if err==nil && won && task.Progress=="100%" { opsmonitor.RecordMidjourney(task) }
 			if err != nil {
 				logger.LogError(ctx, "UpdateMidjourneyTask task error: "+err.Error())
 			} else if won && shouldReturnQuota {

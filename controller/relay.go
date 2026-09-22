@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/opsmonitor"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
@@ -75,6 +76,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError *types.NewAPIError
 		ws          *websocket.Conn
 	)
+	// Capture even validation failures before RelayInfo exists.
+	defer func() {
+		if newAPIError != nil {
+			opsmonitor.Result(c, nil, newAPIError)
+		}
+	}()
 
 	if relayFormat == types.RelayFormatOpenAIRealtime {
 		var err error
@@ -133,6 +140,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if relayFormat != types.RelayFormatOpenAIRealtime {
 			perfmetrics.RecordRelayResult(c.Request.Context(), relayInfo, resultErr)
 		}
+		opsmonitor.Result(c, relayInfo, resultErr)
 		if recovered != nil {
 			panic(recovered)
 		}
@@ -184,16 +192,26 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
 
-		switch relayFormat {
-		case types.RelayFormatOpenAIRealtime:
-			newAPIError = relay.WssHelper(c, relayInfo)
-		case types.RelayFormatClaude:
-			newAPIError = relay.ClaudeHelper(c, relayInfo)
-		case types.RelayFormatGemini:
-			newAPIError = geminiRelayHandler(c, relayInfo)
-		default:
-			newAPIError = relayHandler(c, relayInfo)
-		}
+		finishAttempt := opsmonitor.BeginAttempt(c, relayInfo, retryParam.GetRetry()+1)
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					finishAttempt(types.NewError(fmt.Errorf("relay panic: %v", recovered), types.ErrorCodeBadResponse))
+					panic(recovered)
+				}
+				finishAttempt(newAPIError)
+			}()
+			switch relayFormat {
+			case types.RelayFormatOpenAIRealtime:
+				newAPIError = relay.WssHelper(c, relayInfo)
+			case types.RelayFormatClaude:
+				newAPIError = relay.ClaudeHelper(c, relayInfo)
+			case types.RelayFormatGemini:
+				newAPIError = geminiRelayHandler(c, relayInfo)
+			default:
+				newAPIError = relayHandler(c, relayInfo)
+			}
+		}()
 
 		if newAPIError == nil {
 			service.MarkRequestPolicySuccess(c, relayInfo.StreamStatus)
@@ -316,6 +334,14 @@ func RelayMidjourney(c *gin.Context) {
 	}
 
 	var mjErr *taskdto.MidjourneyResponse
+	started:=time.Now()
+	defer func(){
+		if !opsmonitor.IsGeneration(c) { return }
+		value,_:=c.Get("ops_mj_error")
+		apiErr,_:=value.(*types.NewAPIError)
+		if apiErr==nil && mjErr!=nil { apiErr=types.NewErrorWithStatusCode(errors.New(mjErr.Description+" "+mjErr.Result),types.ErrorCodeInvalidRequest,c.Writer.Status()) }
+		opsmonitor.Submission(c,relayInfo,apiErr,started)
+	}()
 	switch relayInfo.RelayMode {
 	case relayconstant.RelayModeMidjourneyNotify:
 		mjErr = relay.RelayMidjourneyNotify(c)
@@ -473,7 +499,15 @@ func executeTaskSubmissionWith(
 	c *gin.Context,
 	relayInfo *relaycommon.RelayInfo,
 	submit taskSubmitAttempt,
-) (*taskSubmissionOutcome, *taskdto.TaskError) {
+) (outcome *taskSubmissionOutcome, returnedError *taskdto.TaskError) {
+	started := time.Now()
+	defer func() {
+		if recovered:=recover(); recovered!=nil {
+			opsmonitor.Submission(c,relayInfo,types.NewError(fmt.Errorf("task submission panic: %v",recovered),types.ErrorCodeBadResponse),started)
+			panic(recovered)
+		}
+		opsmonitor.Submission(c,relayInfo,opsmonitor.TaskError(returnedError),started)
+	}()
 	policy := service.RequestPolicy(c)
 	diagnostics := newTaskPluginSubmitDiagnostics(c)
 	diagnostics.start(relayInfo)
@@ -544,7 +578,17 @@ func executeTaskSubmissionWith(
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		stage = "submit"
-		result, taskErr = submit(c, relayInfo)
+		finishAttempt := opsmonitor.BeginAttempt(c, relayInfo, retryParam.GetRetry()+1)
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					finishAttempt(types.NewError(fmt.Errorf("task submission panic: %v", recovered), types.ErrorCodeBadResponse))
+					panic(recovered)
+				}
+				finishAttempt(opsmonitor.TaskError(taskErr))
+			}()
+			result, taskErr = submit(c, relayInfo)
+		}()
 		if requestErr := c.Request.Context().Err(); requestErr != nil {
 			diagnostics.cancelled("after_submit", retryParam.GetRetry()+1)
 			taskErr = service.TaskErrorWrapperLocal(requestErr, "request_cancelled", http.StatusRequestTimeout)
@@ -686,6 +730,9 @@ func executeTaskSubmissionWith(
 		return nil, taskErr
 	}
 	durable = true
+	if immediateTerminal {
+		opsmonitor.RecordTask(task, nil)
+	}
 	stage = "settle"
 	diagnostics.durable(task)
 	diagnostics.settleStart(task, result.Quota)
@@ -780,6 +827,9 @@ func respondTaskError(c *gin.Context, taskErr *taskdto.TaskError) {
 // taskSubmissionAPIError adapts a task error for the shared relay error paths.
 // TaskError.Error is nil for many local rejections, so fall back to the message.
 func taskSubmissionAPIError(taskErr *taskdto.TaskError) *types.NewAPIError {
+	if taskErr == nil {
+		return nil
+	}
 	err := taskErr.Error
 	if err == nil {
 		err = errors.New(taskErr.Message)

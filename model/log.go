@@ -338,6 +338,13 @@ type RecordConsumeLogParams struct {
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
+	if tokens := params.DashboardTokens; tokens != nil {
+		c.Set("ops_tokens", c.GetInt64("ops_tokens")+tokens.Input+tokens.Output+tokens.CacheCreation+tokens.CacheRead)
+		c.Set("ops_tokens_known", true)
+		c.Set("ops_tokens_incomplete", c.GetBool("ops_tokens_incomplete") || tokens.Incomplete)
+	} else {
+		c.Set("ops_tokens_incomplete", true)
+	}
 	RecordAdminDashboardUsage(userId, c.GetString("username"), params.ModelName, params.Quota, params.UseTimeSeconds, params.DashboardTokens, true, 1)
 	if !common.LogConsumeEnabled {
 		return

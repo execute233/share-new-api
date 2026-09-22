@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/opsmonitor"
 	"github.com/gin-gonic/gin"
 )
 
@@ -116,6 +117,13 @@ func productionPluginRouteHandlers(generation *jsplugin.RoutingGeneration, bindi
 	}
 	return []gin.HandlerFunc{
 		pinRoute,
+		func(c *gin.Context) {
+			if binding.Route.Type == jsplugin.RouteTypeQuery {
+				c.Next()
+				return
+			}
+			middleware.OpsMonitor(true)(c)
+		},
 		middleware.TokenAuth(),
 		middleware.SystemPerformanceCheck(),
 		middleware.ModelRequestRateLimit(),
@@ -365,6 +373,9 @@ func (d *pluginRouteDispatcher) dispatch(c *gin.Context) {
 	}
 
 	previousTag, hadPreviousTag := c.Get(middleware.RouteTagKey)
+	// The inner engine owns plugin request collection; avoid double counting
+	// the outer no-route dispatch as another client request.
+	opsmonitor.Discard(c)
 	c.Set(middleware.RouteTagKey, "relay")
 	originalContext := c.Request.Context()
 	state := &pluginDispatchState{

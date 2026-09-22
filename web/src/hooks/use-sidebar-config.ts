@@ -60,6 +60,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
   admin: {
     enabled: true,
     dashboard: true,
+    monitoring: true,
     channel: true,
     proxy: true,
     models: true,
@@ -114,6 +115,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/profile': { section: 'personal', module: 'personal' },
   '/security': { section: 'personal', module: 'security' },
   '/admin-dashboard': { section: 'admin', module: 'dashboard' },
+  '/ops-monitor': { section: 'admin', module: 'monitoring' },
   '/channels': { section: 'admin', module: 'channel' },
   '/proxies': { section: 'admin', module: 'proxy' },
   '/models': { section: 'admin', module: 'models' },
