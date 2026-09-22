@@ -242,6 +242,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
 		ChannelId:        relayInfo.ChannelId,
+		DashboardTokens:  dashboardTokens(&dto.Usage{PromptTokens: usage.InputTokens, CompletionTokens: usage.OutputTokens, PromptTokensDetails: usage.InputTokenDetails}, false, false),
 		PromptTokens:     usage.InputTokens,
 		CompletionTokens: usage.OutputTokens,
 		ModelName:        logModel,
@@ -283,6 +284,7 @@ func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData)
 }
 
 func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent string) {
+	dashboardEstimated := usage == nil
 	if usage == nil {
 		usage = &dto.Usage{PromptTokens: relayInfo.GetEstimatePromptTokens(), TotalTokens: relayInfo.GetEstimatePromptTokens()}
 	}
@@ -375,6 +377,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
 		ChannelId:        relayInfo.ChannelId,
+		DashboardTokens:  dashboardTokens(usage, false, dashboardEstimated),
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
 		ModelName:        logModel,

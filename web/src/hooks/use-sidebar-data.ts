@@ -134,6 +134,12 @@ export function useSidebarData(): SidebarData {
         title: t('Admin'),
         items: [
           {
+            title: t('Admin Dashboard'),
+            url: '/admin-dashboard',
+            icon: LayoutDashboard,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,

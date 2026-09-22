@@ -1500,3 +1500,30 @@ func TestAppendToolSurchargeLogInfoWritesOnlyStructuredFields(t *testing.T) {
 	assert.NotContains(t, fields, "image_generation_call")
 	assert.NotContains(t, fields, "image_generation_call_price")
 }
+
+func TestDashboardTokensAreDisjoint(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		usage     *dto.Usage
+		anthropic bool
+		estimated bool
+		want      *model.DashboardTokens
+	}{
+		{name: "OpenAI input includes both cache categories", usage: &dto.Usage{PromptTokens: 100, CompletionTokens: 20, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 30, CacheWriteTokens: 10}}, want: &model.DashboardTokens{Input: 60, Output: 20, CacheRead: 30, CacheCreation: 10}},
+		{name: "Anthropic input excludes cache and split TTLs are counted once", anthropic: true, usage: &dto.Usage{PromptTokens: 60, CompletionTokens: 20, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 30, CachedCreationTokens: 10}, ClaudeCacheCreation5mTokens: 4, ClaudeCacheCreation1hTokens: 6}, want: &model.DashboardTokens{Input: 60, Output: 20, CacheRead: 30, CacheCreation: 10}},
+		{name: "missing usage remains unknown"},
+		{name: "overlapping cache remains unknown", usage: &dto.Usage{PromptTokens: 10, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 8, CacheWriteTokens: 8}}},
+		{name: "estimated usage is identified", estimated: true, usage: &dto.Usage{PromptTokens: 10}, want: &model.DashboardTokens{Input: 10, Incomplete: true}},
+		{name: "canonical upstream source overrides converted counters", usage: &dto.Usage{PromptTokens: 999, BillingUsage: dto.NewOpenAIChatBillingUsage(&dto.Usage{PromptTokens: 50, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 20}})}, want: &model.DashboardTokens{Input: 30, CacheRead: 20}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := dashboardTokens(tc.usage, tc.anthropic, tc.estimated)
+			if tc.want == nil {
+				require.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			assert.Equal(t, *tc.want, *got)
+		})
+	}
+}

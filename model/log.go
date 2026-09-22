@@ -322,21 +322,23 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 }
 
 type RecordConsumeLogParams struct {
-	ChannelId        int       `json:"channel_id"`
-	PromptTokens     int       `json:"prompt_tokens"`
-	CompletionTokens int       `json:"completion_tokens"`
-	ModelName        string    `json:"model_name"`
-	TokenName        string    `json:"token_name"`
-	Quota            int       `json:"quota"`
-	Content          string    `json:"content"`
-	TokenId          int       `json:"token_id"`
-	UseTimeSeconds   int       `json:"use_time_seconds"`
-	IsStream         bool      `json:"is_stream"`
-	Group            string    `json:"group"`
-	Other            *LogOther `json:"other"`
+	DashboardTokens  *DashboardTokens `json:"-"`
+	ChannelId        int              `json:"channel_id"`
+	PromptTokens     int              `json:"prompt_tokens"`
+	CompletionTokens int              `json:"completion_tokens"`
+	ModelName        string           `json:"model_name"`
+	TokenName        string           `json:"token_name"`
+	Quota            int              `json:"quota"`
+	Content          string           `json:"content"`
+	TokenId          int              `json:"token_id"`
+	UseTimeSeconds   int              `json:"use_time_seconds"`
+	IsStream         bool             `json:"is_stream"`
+	Group            string           `json:"group"`
+	Other            *LogOther        `json:"other"`
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
+	RecordAdminDashboardUsage(userId, c.GetString("username"), params.ModelName, params.Quota, params.UseTimeSeconds, params.DashboardTokens, true, 1)
 	if !common.LogConsumeEnabled {
 		return
 	}
@@ -413,6 +415,14 @@ type RecordTaskBillingLogParams struct {
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
+	if params.LogType == LogTypeConsume || params.LogType == LogTypeRefund {
+		username, _ := GetUsernameById(params.UserId, false)
+		quota := params.Quota
+		if params.LogType == LogTypeRefund {
+			quota = -quota
+		}
+		RecordAdminDashboardUsage(params.UserId, username, params.ModelName, quota, 0, nil, false, 0)
+	}
 	if params.LogType == LogTypeConsume && !common.LogConsumeEnabled {
 		return
 	}

@@ -337,6 +337,7 @@ func SetApiRouter(router *gin.Engine) {
 			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
 		}
 
+		apiRouter.GET("/admin-dashboard", middleware.AdminAuth(), controller.GetAdminDashboard)
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)

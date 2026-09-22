@@ -17,6 +17,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var commonGroupCol string
@@ -351,6 +352,8 @@ func migrateDB() error {
 		&Midjourney{},
 		&TopUp{},
 		&QuotaData{},
+		&AdminDashboardBucket{},
+		&AdminDashboardCollection{},
 		&Task{},
 		&TaskPlugin{},
 		&Model{},
@@ -373,6 +376,9 @@ func migrateDB() error {
 		&AuthzRole{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&AdminDashboardCollection{ID: 1, StartedAt: time.Now().Unix()}).Error; err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
