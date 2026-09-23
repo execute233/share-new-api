@@ -13,7 +13,7 @@ import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getOpsEvents, type Filters, type OpsEvent, type Range } from './api'
 
-export function OpsDetails(props: { filters: Filters; range: Range }) {
+export function OpsDetails(props: { filters: Filters; range: Range; paused: boolean }) {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const [kind, setKind] = useState('')
@@ -26,7 +26,7 @@ export function OpsDetails(props: { filters: Filters; range: Range }) {
   const query = useQuery({
     queryKey: ['ops-monitor-events', props.filters, props.range, kind, outcome, applied, cursor],
     queryFn: ({ signal }) => getOpsEvents({ ...props.filters, ...props.range, kind, outcome, ...applied, ...cursor }, signal),
-    refetchInterval: cursor ? false : 10_000,
+    refetchInterval: props.paused || cursor ? false : 10_000,
   })
   const kinds: Record<string, string> = { request: t('Relay request'), attempt: t('Upstream attempt'), task_submission: t('Task submission'), task_completion: t('Task completion') }
   const outcomes: Record<string, string> = { success: t('Success'), failure: t('Failure'), rejected: t('Business rejection'), cancelled: t('Cancelled') }
@@ -47,7 +47,9 @@ export function OpsDetails(props: { filters: Filters; range: Range }) {
       <Input className='w-60' aria-label={t('Request ID')} placeholder={t('Request ID')} maxLength={128} value={search.request_id} onChange={(event) => setSearch({ ...search, request_id: event.target.value })} />
       <Button type='submit' variant='outline'>{t('Search')}</Button>
     </form>
-    {query.isPending ? <LoadingState /> : query.isError ? <ErrorState onRetry={() => void query.refetch()} /> : <>
+    {query.isPending && <LoadingState />}
+    {query.isError && <ErrorState onRetry={() => void query.refetch()} />}
+    {!query.isPending && !query.isError && <>
       <StaticDataTable data={rows} getRowKey={(row) => row.id} emptyContent={t('No data')} columns={[
         { id: 'time', header: t('Time'), cell: (row) => dateFormat.format(row.timestamp * 1000) },
         { id: 'kind', header: t('Event type'), cell: (row) => kinds[row.kind] ?? row.kind },

@@ -73,7 +73,7 @@ export function OpsMonitor() {
         {data.snapshot.start < data.snapshot.started_at && <Alert><AlertDescription>{t('The selected range includes time before collection started. Historical data is not backfilled.')}</AlertDescription></Alert>}
         <OpsOverview data={data} />
         <Card><CardHeader><CardTitle>{t('Request details')}</CardTitle></CardHeader><CardContent>
-          <OpsDetails key={JSON.stringify([filters, period, customStart, customEnd])} filters={filters} range={{ start: data.snapshot.start, end: data.snapshot.end }} />
+          <OpsDetails key={JSON.stringify([filters, period, customStart, customEnd])} filters={filters} range={{ start: data.snapshot.start, end: data.snapshot.end }} paused={paused} />
         </CardContent></Card>
       </>}
     </div></SectionPageLayout.Content>
