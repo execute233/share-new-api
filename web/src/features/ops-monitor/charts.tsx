@@ -34,7 +34,7 @@ export function OpsTrend(props: { snapshot: Snapshot; retries?: boolean }) {
       <XAxis dataKey='time' minTickGap={40} tickFormatter={(value: number) => dateFormat.format(value)} />
       <YAxis yAxisId='left' width={55} tickFormatter={(value: number) => formatCompactNumber(value, locale)} />
       {!props.retries && <YAxis yAxisId='right' orientation='right' width={55} tickFormatter={(value: number) => formatCompactNumber(value, locale)} />}
-      <ChartTooltip content={<ChartTooltipContent labelFormatter={(value) => dateFormat.format(Number(value))} />} />
+      <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => dateFormat.format(payload[0].payload.time)} />} />
       {props.retries ? <Line yAxisId='left' dataKey='retries' stroke='var(--color-retries)' dot={false} isAnimationActive={false} /> : <>
         <Line yAxisId='left' dataKey='qps' stroke='var(--color-qps)' dot={false} isAnimationActive={false} />
         <Line yAxisId='right' dataKey='tps' stroke='var(--color-tps)' dot={false} isAnimationActive={false} />
