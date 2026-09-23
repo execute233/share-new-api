@@ -138,6 +138,14 @@ export function SidebarModulesSection({
       },
     },
     admin: {
+      dashboard: {
+        title: t('Admin Dashboard'),
+        description: t('Aggregated usage metrics and trend charts.'),
+      },
+      monitoring: {
+        title: t('Operations monitoring'),
+        description: t('In-flight requests, errors, and upstream health.'),
+      },
       channel: {
         title: t('Channels'),
         description: t('Configure upstream providers and routing.'),

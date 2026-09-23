@@ -120,6 +120,56 @@ describe('security sidebar visibility', () => {
   })
 })
 
+describe('operations monitoring sidebar entry', () => {
+  it('legacy configurations keep Operations monitoring visible after Admin Dashboard', () => {
+    const { result } = sidebarFor({
+      admin: { enabled: true, dashboard: true },
+    })
+    const items =
+      result.current.find((group) => group.id === 'admin')?.items ?? []
+    const dashboardIndex = items.findIndex(
+      (item) => item.title === 'Admin Dashboard'
+    )
+    expect(items[dashboardIndex + 1]).toMatchObject({
+      title: 'Operations monitoring',
+      url: '/ops-monitor',
+    })
+  })
+
+  it.each([
+    [{ admin: { enabled: true, monitoring: false } }, undefined],
+    [{ admin: { enabled: false } }, { admin: { monitoring: true } }],
+    [undefined, { admin: { enabled: true, monitoring: false } }],
+  ])(
+    'admin and personal visibility rules can hide Operations monitoring (%j, %j)',
+    (admin, user) => {
+      const { result } = sidebarFor(admin, user)
+      expect(
+        result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.title === 'Operations monitoring')
+      ).toBe(false)
+    }
+  )
+
+  it('parses a saved monitoring toggle from the admin sidebar modules', () => {
+    const config = parseSidebarModulesAdmin(
+      '{"admin":{"enabled":true,"dashboard":true}}'
+    )
+    expect(config.admin.dashboard).toBe(true)
+    expect(config.admin.monitoring).toBe(true)
+    config.admin.monitoring = false
+    const { result } = sidebarFor(
+      parseSidebarModulesAdmin(serializeSidebarModulesAdmin(config))
+    )
+    const titles = result.current
+      .flatMap((group) => group.items)
+      .map((item) => item.title)
+    expect(titles).not.toContain('Operations monitoring')
+    expect(titles).toContain('Admin Dashboard')
+  })
+})
+
 describe('audit log sidebar entry', () => {
   it('admin settings default Audit Logs to visible and preserve its independent toggle when saved', () => {
     const config = parseSidebarModulesAdmin(
