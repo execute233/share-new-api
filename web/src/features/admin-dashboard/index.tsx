@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Timer,
   Users,
+  BoxIcon
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -205,7 +206,7 @@ export function AdminDashboard() {
                 <StatCard
                   title={t('Today requests')}
                   value={number(data.today.requests)}
-                  description={t('Since collection: {{count}}', {
+                  description={t('Total: {{count}}', {
                     count: number(data.total.requests),
                   })}
                   icon={Activity}
@@ -222,7 +223,7 @@ export function AdminDashboard() {
                   title={t('Today tokens')}
                   value={tokenValue(data.today)}
                   description={`${t('Usage charge')}: ${formatQuotaWithCurrency(data.today.quota)}`}
-                  icon={Coins}
+                  icon={BoxIcon}
                 />
                 <StatCard
                   title={t('Tokens since collection')}
@@ -264,30 +265,6 @@ export function AdminDashboard() {
                   })}
                 </p>
               )}
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('Quick actions')}</CardTitle>
-                </CardHeader>
-                <CardContent className='flex flex-wrap gap-3'>
-                  <Button variant='outline' render={<Link to='/channels' />}>
-                    {t('Channels')}
-                  </Button>
-                  <Button variant='outline' render={<Link to='/users' />}>
-                    {t('Users')}
-                  </Button>
-                  <Button
-                    variant='outline'
-                    render={
-                      <Link
-                        to='/usage-logs/$section'
-                        params={{ section: 'common' }}
-                      />
-                    }
-                  >
-                    {t('Usage Logs')}
-                  </Button>
-                </CardContent>
-              </Card>
             </>
           )}
           <div className='flex flex-wrap items-center gap-3 rounded-xl border p-4'>
