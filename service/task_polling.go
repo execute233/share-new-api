@@ -109,7 +109,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 			continue
 		}
 		timedOutCount++
-		opsmonitor.RecordTask(task,nil)
+		opsmonitor.RecordTask(task, nil)
 		if !isLegacy && task.Quota != 0 {
 			RefundTaskQuota(ctx, task, reason)
 		}
