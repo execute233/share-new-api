@@ -80,7 +80,7 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 			model.DB, model.LOG_DB = db, logDB
 			common.SetDatabaseTypes(dialect.name, dialect.name)
 			t.Cleanup(func() { model.DB, model.LOG_DB = oldDB, oldLogDB; common.SetDatabaseTypes(oldMainType, oldLogType) })
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}))
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}, &model.AdminDashboardBucket{}))
 			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
 			versionQuery := "select version()"
 			if dialect.name == common.DatabaseTypeSQLite {
@@ -157,6 +157,7 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 			require.NoError(t, db.Create(&channel).Error)
 			t.Cleanup(func() {
 				require.NoError(t, logDB.Where("user_id = ?", user.Id).Delete(&model.Log{}).Error)
+				require.NoError(t, db.Where("user_id = ?", user.Id).Delete(&model.AdminDashboardBucket{}).Error)
 				require.NoError(t, db.Unscoped().Delete(&token).Error)
 				require.NoError(t, db.Unscoped().Delete(&user).Error)
 				require.NoError(t, db.Unscoped().Delete(&channel).Error)
@@ -230,9 +231,9 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 					if tc.realtime {
 						PostWssConsumeQuota(ctx, info, info.OriginModelName, &dto.RealtimeUsage{
 							InputTokens: tc.usage.PromptTokens, OutputTokens: tc.usage.CompletionTokens, TotalTokens: tc.usage.TotalTokens,
-						}, "")
+						}, nil)
 					} else if tc.audio {
-						PostAudioConsumeQuota(ctx, info, tc.usage, "")
+						PostAudioConsumeQuota(ctx, info, tc.usage, nil)
 					} else {
 						PostTextConsumeQuota(ctx, info, tc.usage, nil)
 					}
@@ -240,8 +241,12 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 					var log model.Log
 					require.NoError(t, logDB.Where("user_id = ?", user.Id).Take(&log).Error)
 					assert.Equal(t, tc.want, log.Quota)
+					var bucket model.AdminDashboardBucket
+					require.NoError(t, db.Where("user_id = ?", user.Id).Take(&bucket).Error)
+					assert.EqualValues(t, tc.want, bucket.Quota)
+					assert.EqualValues(t, 1, bucket.Requests)
 					assert.Equal(t, tc.stream, log.IsStream)
-					assert.NotContains(t, log.Content, "无法扣费")
+					assert.NotContains(t, log.Content, "nothing was charged")
 					var other map[string]any
 					require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
 					assert.Equal(t, string(tc.unit), other["billing_unit"])
@@ -1021,7 +1026,6 @@ func TestComposeTieredTextQuotaFallbackKeepsToolCallSurcharges(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	ctx.Set("claude_web_search_requests", 2)
 
 	relayInfo := &relaycommon.RelayInfo{
 		OriginModelName: "claude-3-7-sonnet",
@@ -1029,6 +1033,11 @@ func TestComposeTieredTextQuotaFallbackKeepsToolCallSurcharges(t *testing.T) {
 			ModelRatio:      1,
 			CompletionRatio: 1,
 			GroupRatioInfo:  hosttypes.GroupRatioInfo{GroupRatio: 1.25},
+		},
+		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
+				dto.BuildInToolWebSearch: {ToolName: dto.BuildInToolWebSearch, CallCount: 2},
+			},
 		},
 		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
 			BillingMode:               "tiered_expr",
@@ -1055,7 +1064,6 @@ func TestComposeTieredTextQuotaErrorFallbackUsesPreConsumedQuota(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	ctx.Set("claude_web_search_requests", 2)
 
 	relayInfo := &relaycommon.RelayInfo{
 		OriginModelName: "claude-3-7-sonnet",
@@ -1063,6 +1071,11 @@ func TestComposeTieredTextQuotaErrorFallbackUsesPreConsumedQuota(t *testing.T) {
 			ModelRatio:      1,
 			CompletionRatio: 1,
 			GroupRatioInfo:  hosttypes.GroupRatioInfo{GroupRatio: 1.25},
+		},
+		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
+				dto.BuildInToolWebSearch: {ToolName: dto.BuildInToolWebSearch, CallCount: 2},
+			},
 		},
 		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
 			BillingMode:               "tiered_expr",
@@ -1257,29 +1270,30 @@ func TestCalculateTextToolCallSurchargeDoesNotInferSearchForResponses(t *testing
 	assert.Empty(t, summary.ToolSurchargeItems)
 }
 
-func TestCalculateTextToolCallSurchargeMergesSameNameAndPrice(t *testing.T) {
+// Every BuiltInTools count is bounded by MaxBillableToolCallCount at
+// settlement, whatever recorded it (upstream-reported counts and per-item
+// counts alike).
+func TestCalculateTextToolCallSurchargeClampsCallCount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Set("claude_web_search_requests", 3)
 
-	relayInfo := &relaycommon.RelayInfo{
-		OriginModelName: "claude-3-7-sonnet",
-		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
-			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
-				dto.BuildInToolWebSearch: {CallCount: 2},
+	for recorded, billed := range map[int]int{5: 5, 10_000: 10_000, 10_005: 10_000} {
+		relayInfo := &relaycommon.RelayInfo{
+			OriginModelName: "claude-3-7-sonnet",
+			ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+				BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
+					dto.BuildInToolWebSearch: {CallCount: recorded},
+				},
 			},
-		},
+		}
+		summary := &textQuotaSummary{ModelName: relayInfo.OriginModelName, GroupRatio: 1}
+
+		surcharge := calculateTextToolCallSurcharge(ctx, relayInfo, summary)
+
+		assert.Equal(t, []ToolSurchargeItem{{Name: dto.BuildInToolWebSearch, Count: billed, Price: 10}}, summary.ToolSurchargeItems, recorded)
+		expected := decimal.NewFromFloat(10.0 * float64(billed) / 1000).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
+		assert.True(t, expected.Equal(surcharge), "recorded %d: got %s want %s", recorded, surcharge, expected)
 	}
-	summary := &textQuotaSummary{ModelName: relayInfo.OriginModelName, GroupRatio: 1}
-
-	surcharge := calculateTextToolCallSurcharge(ctx, relayInfo, summary)
-
-	require.Len(t, summary.ToolSurchargeItems, 1)
-	assert.Equal(t, dto.BuildInToolWebSearch, summary.ToolSurchargeItems[0].Name)
-	assert.Equal(t, 5, summary.ToolSurchargeItems[0].Count)
-	assert.Equal(t, 10.0, summary.ToolSurchargeItems[0].Price)
-	expected := decimal.NewFromFloat(10.0 * 5 / 1000).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
-	assert.True(t, expected.Equal(surcharge), "got %s want %s", surcharge, expected)
 }
 
 func TestMergeToolSurchargeItemsSaturatesCountOverflow(t *testing.T) {
@@ -1350,10 +1364,16 @@ func TestCalculateTextQuotaSummaryDoesNotApplyRequestMultipliersToToolSurcharge(
 func TestCalculateTextToolCallSurchargeGeminiGoogleSearch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Set("gemini_google_search_call", true)
 
-	relayInfo := &relaycommon.RelayInfo{OriginModelName: "gemini-2.5-flash"}
-	summary := &textQuotaSummary{ModelName: "gemini-2.5-flash", GroupRatio: 1}
+	relayInfo := &relaycommon.RelayInfo{
+		OriginModelName: "gemini-3.7-flash",
+		ResponsesUsageInfo: &relaycommon.ResponsesUsageInfo{
+			BuiltInTools: map[string]*relaycommon.BuildInToolInfo{
+				dto.BuildInToolGoogleSearch: {ToolName: dto.BuildInToolGoogleSearch, CallCount: 1},
+			},
+		},
+	}
+	summary := &textQuotaSummary{ModelName: "gemini-3.7-flash", GroupRatio: 1}
 
 	surcharge := calculateTextToolCallSurcharge(ctx, relayInfo, summary)
 	expected := decimal.NewFromFloat(14.0 / 1000).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
@@ -1526,4 +1546,73 @@ func TestDashboardTokensAreDisjoint(t *testing.T) {
 			assert.Equal(t, *tc.want, *got)
 		})
 	}
+}
+
+func TestPostTextConsumeQuotaPreservesDashboardAndStructuredContent(t *testing.T) {
+	truncate(t)
+	const userID, channelID = 63, 63
+	require.NoError(t, model.DB.AutoMigrate(&model.AdminDashboardBucket{}))
+	t.Cleanup(func() {
+		require.NoError(t, model.DB.Where("user_id = ?", userID).Delete(&model.AdminDashboardBucket{}).Error)
+	})
+	seedUser(t, userID, 10_000)
+	seedChannel(t, channelID)
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	info := &relaycommon.RelayInfo{
+		UserId: userID, OriginModelName: "dashboard-log-model", UsingGroup: "default", StartTime: time.Now(),
+		ChannelMeta: &relaycommon.ChannelMeta{ChannelId: channelID},
+		PriceData:   hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}},
+	}
+	usage := &dto.Usage{PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 30}}
+	PostTextConsumeQuota(ctx, info, usage, []*common.Message{common.NewMessage("Model {{model}}", map[string]any{"model": "dashboard-log-model"})})
+	assert.True(t, ctx.GetBool("ops_tokens_known"))
+	assert.False(t, ctx.GetBool("ops_tokens_incomplete"))
+	assert.EqualValues(t, 120, ctx.GetInt64("ops_tokens"))
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Contains(t, log.Content, "Model dashboard-log-model")
+	var bucket model.AdminDashboardBucket
+	require.NoError(t, model.DB.Where("user_id = ?", userID).Take(&bucket).Error)
+	assert.EqualValues(t, 70, bucket.InputTokens)
+	assert.EqualValues(t, 20, bucket.OutputTokens)
+	assert.EqualValues(t, 30, bucket.CacheReadTokens)
+	assert.EqualValues(t, log.Quota, bucket.Quota)
+	var other map[string]any
+	require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
+	assert.Contains(t, other["content_parts"], map[string]any{"key": "Model {{model}}", "params": map[string]any{"model": "dashboard-log-model"}})
+}
+
+// A request whose upstream returns no usage is logged without a charge. The
+// reason is stored as content_parts, which the web console renders in the
+// viewer's language; content keeps the English text.
+func TestPostTextConsumeQuotaLogsMissingUsageAsStructuredContent(t *testing.T) {
+	truncate(t)
+	const userID, channelID = 62, 62
+	seedUser(t, userID, 10_000)
+	seedChannel(t, channelID)
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	info := &relaycommon.RelayInfo{
+		UserId:          userID,
+		OriginModelName: "missing-usage-model",
+		UsingGroup:      "default",
+		StartTime:       time.Now(),
+		ChannelMeta:     &relaycommon.ChannelMeta{ChannelId: channelID},
+		PriceData:       hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}},
+	}
+
+	PostTextConsumeQuota(ctx, info, &dto.Usage{}, nil)
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Zero(t, log.Quota)
+	assert.Equal(t, "Upstream returned no usage, so nothing was charged (possibly an upstream timeout)", log.Content)
+	var other map[string]any
+	require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
+	assert.Equal(t, []any{
+		map[string]any{"key": "Upstream returned no usage, so nothing was charged (possibly an upstream timeout)"},
+	}, other["content_parts"])
 }

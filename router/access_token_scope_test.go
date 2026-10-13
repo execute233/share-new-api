@@ -132,6 +132,9 @@ func TestAccessTokenRouteRulesCoverEveryDashboardRoute(t *testing.T) {
 	for _, route := range channelPermissionRoutes {
 		permissionRoutes[route.method+" "+joinPaths("/api/channel", route.path)] = route.permission
 	}
+	for _, route := range proxyPermissionRoutes {
+		permissionRoutes[route.method+" "+joinPaths("/api/proxy", route.path)] = route.permission
+	}
 	for key, permission := range accessTokenHelperRoutes {
 		permissionRoutes[key] = permission
 	}
@@ -140,6 +143,11 @@ func TestAccessTokenRouteRulesCoverEveryDashboardRoute(t *testing.T) {
 		require.True(t, ok, key)
 		assert.Equal(t, "scope", rule.Kind(), key)
 		assert.Equal(t, service.AccessTokenScopeOf(permission), rule.Scope(), key)
+	}
+	for _, key := range []string{"GET /api/admin-dashboard", "GET /api/ops-monitor", "GET /api/ops-monitor/events"} {
+		rule, ok := middleware.AccessTokenRouteRule(key)
+		require.True(t, ok, key)
+		assert.Equal(t, "log:read", rule.Scope(), key)
 	}
 }
 

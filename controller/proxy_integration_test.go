@@ -3,10 +3,13 @@ package controller
 import (
 	"context"
 	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -65,6 +68,79 @@ func TestProxyPoolRoutesManagementAndRelayContext(t *testing.T) {
 	status, err := fetchInferenceStatus(context.Background(), channel)
 	require.NoError(t, err)
 	assert.Equal(t, "proxy-version", status.Version)
+}
+
+func TestProxyPoolManagementHonorsChannelTLS(t *testing.T) {
+	db := setupProxyControllerTestDB(t)
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1beta/models" {
+			_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-test"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[{"id":"proxied-model"}]}`))
+	}))
+	t.Cleanup(upstream.Close)
+	var connections atomic.Int64
+	connectProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		target, err := net.Dial("tcp", r.Host)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		defer target.Close()
+		conn, buffered, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		connections.Add(1)
+		_, _ = conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		go func() { _, _ = io.Copy(target, buffered) }()
+		_, _ = io.Copy(conn, target)
+	}))
+	t.Cleanup(connectProxy.Close)
+	service.InitHttpClient()
+	t.Cleanup(service.ResetProxyClientCache)
+	endpoint, err := url.Parse(connectProxy.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(endpoint.Port())
+	require.NoError(t, err)
+	proxy := model.Proxy{Name: "tls-integration", Protocol: model.ProxyProtocolHTTP, Host: endpoint.Hostname(), Port: port, Status: model.ProxyStatusActive}
+	require.NoError(t, db.Create(&proxy).Error)
+	for _, tc := range []struct {
+		name        string
+		channelType int
+		skipVerify  bool
+		wantModels  []string
+	}{
+		{name: "OpenAI verifies", channelType: constant.ChannelTypeOpenAI},
+		{name: "OpenAI skips verification", channelType: constant.ChannelTypeOpenAI, skipVerify: true, wantModels: []string{"proxied-model"}},
+		{name: "Gemini verifies", channelType: constant.ChannelTypeGemini},
+		{name: "Gemini skips verification", channelType: constant.ChannelTypeGemini, skipVerify: true, wantModels: []string{"gemini-test"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			channel := &model.Channel{Type: tc.channelType, Key: "key", BaseURL: &upstream.URL, ProxyID: &proxy.ID}
+			channel.SetSetting(dto.ChannelSettings{Proxy: "http://legacy.invalid:1", TLSInsecureSkipVerify: tc.skipVerify})
+			models, err := fetchChannelUpstreamModelIDs(channel)
+			if tc.skipVerify {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantModels, models)
+				body, err := GetResponseBody(http.MethodGet, upstream.URL+"/balance", channel, http.Header{})
+				require.NoError(t, err)
+				assert.JSONEq(t, `{"data":[{"id":"proxied-model"}]}`, string(body))
+			} else {
+				require.ErrorContains(t, err, "certificate")
+				_, err = GetResponseBody(http.MethodGet, upstream.URL+"/balance", channel, http.Header{})
+				require.ErrorContains(t, err, "certificate")
+			}
+			assert.Equal(t, "http://legacy.invalid:1", channel.GetSetting().Proxy)
+		})
+	}
+	assert.Positive(t, connections.Load(), "management requests must pass through the bound proxy")
 }
 
 func TestChannelProxyBindingClearIsAtomic(t *testing.T) {

@@ -13,7 +13,7 @@ func registerProxyRoutes(apiRouter *gin.RouterGroup) {
 	proxyRoute := apiRouter.Group("/proxy")
 	proxyRoute.Use(middleware.AdminAuth())
 	for _, route := range proxyPermissionRoutes {
-		proxyRoute.Handle(route.method, route.path, middleware.RequirePermission(route.permission), route.handler)
+		handlePermissionRoute(proxyRoute, route.method, route.path, route.permission, route.handler)
 	}
 }
 

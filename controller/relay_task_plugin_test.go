@@ -438,8 +438,10 @@ func setupTaskSubmissionDatabase(t *testing.T, migrate bool, events *[]string) *
 		models = append(models, &model.Task{})
 	}
 	database, _ := openTaskDialectDatabase(t, models...)
-	require.NoError(t, database.Callback().Create().Before("gorm:create").Register("test:task-submit-order", func(*gorm.DB) {
-		*events = append(*events, "insert")
+	require.NoError(t, database.Callback().Create().Before("gorm:create").Register("test:task-submit-order", func(tx *gorm.DB) {
+		if _, taskInsert := tx.Statement.Dest.(*model.Task); taskInsert {
+			*events = append(*events, "insert")
+		}
 	}))
 	model.DB = database
 	t.Cleanup(func() { model.DB = previousDB })

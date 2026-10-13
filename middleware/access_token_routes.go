@@ -44,6 +44,9 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	// router/api-router.go: top level
 	"GET /api/models":                     accessTokenScopeRule("profile:read"),
 	"GET /api/status/test":                accessTokenScopeRule("log:read"),
+	"GET /api/admin-dashboard":            accessTokenScopeRule("log:read"),
+	"GET /api/ops-monitor":                accessTokenScopeRule("log:read"),
+	"GET /api/ops-monitor/events":         accessTokenScopeRule("log:read"),
 	"GET /api/pricing":                    accessTokenAnyRule,
 	"GET /api/perf-metrics/summary":       accessTokenAnyRule,
 	"GET /api/perf-metrics":               accessTokenAnyRule,
@@ -241,6 +244,8 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/log/search":                       accessTokenScopeRule("log:read"),
 	"GET /api/log/self":                         accessTokenScopeRule("usage:read"),
 	"GET /api/log/self/search":                  accessTokenScopeRule("usage:read"),
+	"GET /api/log/export":                       accessTokenScopeRule("log:read"),
+	"GET /api/log/self/export":                  accessTokenScopeRule("usage:read"),
 	"GET /api/data/":                            accessTokenScopeRule("log:read"),
 	"GET /api/data/users":                       accessTokenScopeRule("log:read"),
 	"GET /api/data/self":                        accessTokenScopeRule("usage:read"),
