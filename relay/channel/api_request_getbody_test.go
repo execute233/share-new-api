@@ -416,20 +416,23 @@ func runGoAwayAfterFirstRequestServer(ln net.Listener) <-chan h2ServerResult {
 
 			if attempt == 0 {
 				err = framer.WriteGoAway(0, http2.ErrCodeNo, nil)
-				conn.Close()
-				if err != nil {
-					res.err = err
-					return
-				}
-				continue
+			} else {
+				err = writeH2TestResponse(framer, streamID)
 			}
-
-			err = writeH2TestResponse(framer, streamID)
+			// Let the client read GOAWAY or the response before closing the
+			// connection. Closing with an unread SETTINGS ACK can reset TCP
+			// on Windows and replace the graceful shutdown with a socket error.
+			if err == nil {
+				err = conn.(*net.TCPConn).CloseWrite()
+			}
+			if err == nil {
+				_, err = io.Copy(io.Discard, conn)
+			}
 			conn.Close()
 			if err != nil {
 				res.err = err
+				return
 			}
-			return
 		}
 	}()
 	return resCh

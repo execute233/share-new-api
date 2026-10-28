@@ -16,7 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { cleanup, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import * as dashboardApi from '@/features/dashboard/api'
@@ -33,5 +39,10 @@ it('shows an error state when quota data returns a business failure with HTTP 20
 
   render(<LogStatCards />)
 
-  expect(await screen.findAllByText('--')).toHaveLength(5)
+  await waitFor(() => {
+    for (const card of screen.getAllByRole('group')) {
+      expect(card).toHaveAttribute('aria-busy', 'false')
+      expect(within(card).getByText('--')).toBeVisible()
+    }
+  })
 })
